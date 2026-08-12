@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://snap-rank-fantasy.com/sitemap.xml

@@ -2,6 +2,13 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.06 — 2026-08-13
+
+- **New: accounts** — Log In / Sign Up available from the sidebar on every page (`auth.js`, powered by Supabase). Sign up, confirm your email, log in, log out — all working
+- This is the foundation everything else builds on: cloud-saved rankings, community averages, and the ad-removal payment will all check the same "is this user logged in" state this sets up
+- Tested end-to-end against a simulated Supabase backend (sign-up, login, logout, and the auth-state-driven UI update all verified) since the real Supabase domain isn't reachable from my build environment — **please confirm actual sign-up/login works once deployed**, since this is the one part of this update I couldn't test against the real service
+- Nothing else changed for existing users — no accounts required to use any part of the site as before
+
 ## v0.05 — 2026-08-13
 
 - **Fixed: Stats Hub was silently locked to PPR everywhere** — added a real Full PPR / Half PPR / Standard selector (on the browse grid, and again inside the player profile modal since the modal covers the page and the outer selector isn't clickable while it's open)

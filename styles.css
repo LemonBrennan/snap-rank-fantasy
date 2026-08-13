@@ -426,3 +426,19 @@
   .compOutcome.up { color: #1a7a3c; }
   .compOutcome.down { color: var(--oxblood); }
   .noHistoryNote { font-size: 13px; color: var(--ink-faint); padding: 20px 0; }
+
+  /* ---------- Auth widget (sidebar) ---------- */
+  .authWidgetWrap { border-top: 1px solid var(--oxblood-soft); margin-top: 16px; padding-top: 16px; }
+  .authLoginLink { color: var(--ink); }
+  .authLoginLink:hover { background: rgba(122,36,24,0.08); }
+  .authLoggedIn { padding: 0 12px; }
+  .authEmail {
+    font-size: 12px; color: var(--ink-soft); margin-bottom: 8px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .authLogoutBtn {
+    background: none; border: 1px solid var(--oxblood-soft); color: var(--oxblood);
+    border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+  }
+  .authLogoutBtn:hover { border-color: var(--oxblood); background: rgba(122,36,24,0.08); }

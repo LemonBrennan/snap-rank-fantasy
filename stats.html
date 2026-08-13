@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stats Hub — Snap Rank Fantasy</title>
+<link rel="canonical" href="https://snap-rank-fantasy.com/stats.html">
+<meta name="description" content="Browse every player's season-by-season history, see where they ranked at every stat, and compare them to similar players from NFL history.">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Stats Hub — Snap Rank Fantasy">
+<meta property="og:description" content="Browse every player's season-by-season history, see where they ranked at every stat, and compare them to similar players from NFL history.">
+<meta property="og:image" content="assets/og-image.png">
+<meta property="og:url" content="https://snap-rank-fantasy.com/stats.html">
+
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="512x512" href="assets/favicon-512.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="appLayout">
+<aside class="sidebar">
+  <div class="sidebarLogo"><img src="assets/sidebar-logo.png" alt="Snap Rank Fantasy"></div>
+  <nav class="sidebarNav">
+    <a href="index.html" class="sidebarNavLink">Rank Players</a>
+    <a href="stats.html" class="sidebarNavLink active">Stats Hub</a>
+    <a href="about.html" class="sidebarNavLink">About</a>
+  </nav>
+</aside>
+<div class="pageContent">
+
+<div class="yardlines">
+  <div class="wrap">
+    <div class="eyebrow">SNAP RANK FANTASY &middot; 2026 SEASON</div>
+    <h1 class="display">Stats Hub</h1>
+    <p class="sub">Search any player, see their full season-by-season history, and find out who they're really comparable to.</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="statsControls">
+    <input type="text" id="statsSearch" class="statsSearchInput" placeholder="Search for a player by name&hellip;" autocomplete="off">
+    <div class="statsPosFilters" id="statsPosFilters">
+      <div class="countChip selected" data-pos="ALL">All</div>
+      <div class="countChip" data-pos="RB">RB</div>
+      <div class="countChip" data-pos="QB">QB</div>
+      <div class="countChip" data-pos="WR">WR</div>
+      <div class="countChip" data-pos="TE">TE</div>
+    </div>
+  </div>
+  <p class="statsResultCount" id="statsResultCount"></p>
+  <div class="statsGrid" id="statsGrid"></div>
+</div>
+
+<div class="modalOverlay hidden" id="modalOverlay">
+  <div class="modalBox">
+    <button class="modalCloseBtn" id="modalCloseBtn">&times;</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<footer class="siteFooter">
+  Snap Rank Fantasy is an independent, fan-made tool and is not affiliated with, endorsed by, or sponsored by the NFL, NFLPA, or any NFL team, player, or league. All team names, logos, and colors are property of their respective owners and are used here for identification purposes only. Player statistics, schedule, and roster data courtesy of <a href="https://nflverse.nflverse.com/" target="_blank" rel="noopener">nflverse</a> (CC-BY 4.0). For entertainment and informational purposes only &mdash; not betting or financial advice.
+</footer>
+
+</div>
+</div>
+
+<script src="data.js"></script>
+<script src="player-history.js"></script>
+<script src="comp-pool.js"></script>
+<script src="rookie-comp-pool.js"></script>
+<script>
+
+const STAT_LABELS = {
+  ppg: 'Points per game',
+  passing_yards_pg: 'Passing yards/gm', passing_tds_pg: 'Passing TDs/gm', completions_pg: 'Completions/gm', passing_interceptions_pg: 'INTs/gm',
+  rushing_yards_pg: 'Rushing yards/gm', rushing_tds_pg: 'Rushing TDs/gm', carries_pg: 'Carries/gm',
+  receptions_pg: 'Receptions/gm', receiving_yards_pg: 'Receiving yards/gm', receiving_tds_pg: 'Receiving TDs/gm', targets_pg: 'Targets/gm',
+  target_share: 'Target share', wopr: 'WOPR (opportunity)',
+};
+
+function normalize(name) {
+  return (name || '').toLowerCase().replace(/[.'\u2019-]/g, '').replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '').replace(/\s+/g, ' ').trim();
+}
+
+let allPlayers = [];
+POSITION_ORDER.forEach(pos => {
+  (POSITION_DATA[pos] || []).forEach(p => allPlayers.push({ ...p, pos }));
+});
+
+let currentFilterPos = 'ALL';
+let currentQuery = '';
+
+function renderGrid() {
+  let list = allPlayers;
+  if (currentFilterPos !== 'ALL') list = list.filter(p => p.pos === currentFilterPos);
+  if (currentQuery.length >= 1) {
+    const q = currentQuery.toLowerCase();
+    list = list.filter(p => p.name.toLowerCase().includes(q));
+  }
+  list = list.slice(0, 60); // cap render for performance; search narrows it down
+
+  document.getElementById('statsResultCount').textContent =
+    (currentQuery || currentFilterPos !== 'ALL') ? list.length + ' players match' : 'Showing top players — search or filter to narrow down';
+
+  const grid = document.getElementById('statsGrid');
+  grid.innerHTML = list.map(p => {
+    const hs = p.headshot ? '<img class="headshot" src="' + p.headshot + '" alt="" onerror="this.style.display=\'none\'">' : '';
+    const ppgLine = (p.hasStats !== false && p.stats) ? '<div class="miniPpg">' + computePoints(p.stats, 'ppr').toFixed(1) + ' pts/gm</div>' : '<div class="miniPpg" style="color:var(--ink-faint);">New to the league</div>';
+    return '<div class="statsCard" data-name="' + p.name.replace(/"/g,'&quot;') + '" data-pos="' + p.pos + '">' +
+      hs +
+      '<div class="nm">' + p.name + '</div>' +
+      '<div class="meta">' + p.team + ' &middot; ' + p.pos + '</div>' +
+      ppgLine +
+    '</div>';
+  }).join('');
+
+  grid.querySelectorAll('.statsCard').forEach(el => {
+    el.addEventListener('click', () => openPlayerModal(el.dataset.name, el.dataset.pos));
+  });
+}
+
+function computePoints(stats, format) {
+  if (!stats) return 0;
+  const pprMult = format === 'ppr' ? 1 : format === 'half' ? 0.5 : 0;
+  const rec = stats.rec || 0;
+  let pts = 0;
+  pts += (stats.passYds || 0) / 25 + (stats.passTds || 0) * 4 - (stats.passInt || 0) * 2;
+  pts += (stats.rushYds || 0) / 10 + (stats.rushTds || 0) * 6;
+  pts += (stats.recYds || 0) / 10 + (stats.recTds || 0) * 6 + rec * pprMult;
+  return pts;
+}
+
+document.getElementById('statsSearch').addEventListener('input', (e) => {
+  currentQuery = e.target.value.trim();
+  renderGrid();
+});
+document.getElementById('statsPosFilters').querySelectorAll('.countChip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    currentFilterPos = chip.dataset.pos;
+    document.querySelectorAll('#statsPosFilters .countChip').forEach(c => c.classList.toggle('selected', c === chip));
+    renderGrid();
+  });
+});
+
+/* ---------- Color-coded rank pill ---------- */
+function rankColor(rank, of) {
+  if (!of || of <= 1) return 'hsl(50, 20%, 70%)';
+  const percentile = (of - rank) / (of - 1); // 1 = best, 0 = worst
+  const hue = Math.max(0, Math.min(120, percentile * 120));
+  return 'hsl(' + hue.toFixed(0) + ', 68%, 54%)';
+}
+
+/* ---------- Player modal ---------- */
+let currentModalPlayer = null;
+let currentModalSeasonIdx = 0;
+
+function openPlayerModal(name, pos) {
+  const poolPlayer = allPlayers.find(p => p.name === name && p.pos === pos);
+  currentModalPlayer = poolPlayer;
+  const historyKey = name + '|' + pos;
+  const history = PLAYER_HISTORY[historyKey] || [];
+  currentModalSeasonIdx = 0;
+  renderModal(poolPlayer, history);
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.add('hidden');
+}
+document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+document.getElementById('modalOverlay').addEventListener('click', (e) => {
+  if (e.target.id === 'modalOverlay') closeModal();
+});
+
+function renderModal(player, history) {
+  const hs = player.headshot ? '<img class="headshot" src="' + player.headshot + '" alt="" onerror="this.style.display=\'none\'">' : '';
+  let html = '<div class="modalHeader">' + hs +
+    '<div><div class="nm display">' + player.name + '</div>' +
+    '<div class="meta">' + player.team + ' &middot; ' + player.pos + '</div></div></div>';
+
+  if (history.length === 0) {
+    html += '<p class="noHistoryNote">No NFL season history yet &mdash; rookie or missed all available seasons.</p>';
+    html += rookieCompSectionHTML(player);
+    document.getElementById('modalContent').innerHTML = html;
+    return;
+  }
+
+  html += '<div class="seasonSelectRow"><label for="seasonSelect">Season:</label><select id="seasonSelect"></select></div>';
+  html += '<div class="statRankGrid" id="statRankGrid"></div>';
+  html += '<div id="compSectionContainer"></div>';
+
+  document.getElementById('modalContent').innerHTML = html;
+
+  const seasonSelect = document.getElementById('seasonSelect');
+  seasonSelect.innerHTML = history.map((s, i) => '<option value="' + i + '">' + s.season + ' (' + s.team + ')</option>').join('');
+  seasonSelect.value = currentModalSeasonIdx;
+  seasonSelect.addEventListener('change', () => {
+    currentModalSeasonIdx = parseInt(seasonSelect.value, 10);
+    renderSeasonStats(player, history[currentModalSeasonIdx]);
+  });
+
+  renderSeasonStats(player, history[0]);
+}
+
+function renderSeasonStats(player, seasonObj) {
+  const grid = document.getElementById('statRankGrid');
+  const rankKeys = Object.keys(seasonObj.ranks || {});
+  const displayVal = (key) => {
+    if (key === 'ppg') return seasonObj.ppg;
+    const map = {
+      passing_yards_pg: seasonObj.stats.passYds, passing_tds_pg: seasonObj.stats.passTds,
+      completions_pg: seasonObj.stats.passComp, passing_interceptions_pg: seasonObj.stats.passInt,
+      rushing_yards_pg: seasonObj.stats.rushYds, rushing_tds_pg: seasonObj.stats.rushTds, carries_pg: seasonObj.stats.rushAtt,
+      receptions_pg: seasonObj.stats.rec, receiving_yards_pg: seasonObj.stats.recYds, receiving_tds_pg: seasonObj.stats.recTds, targets_pg: seasonObj.stats.tgt,
+    };
+    return map[key];
+  };
+
+  grid.innerHTML = rankKeys.map(key => {
+    const r = seasonObj.ranks[key];
+    const val = displayVal(key);
+    const valStr = (val == null) ? '\u2014' : val.toFixed(1);
+    const color = rankColor(r.rank, r.of);
+    return '<div class="statRankRow">' +
+      '<div class="statRankLabel">' + (STAT_LABELS[key] || key) + ' &mdash; ' + valStr + '</div>' +
+      '<div class="statRankValue"><span class="rankPill" style="background:' + color + '">#' + r.rank + '</span>' +
+      '<span class="statRankNum">of ' + r.of + '</span></div>' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('compSectionContainer').innerHTML = veteranCompSectionHTML(player, seasonObj);
+}
+
+/* ---------- Veteran comp tool ---------- */
+function veteranCompSectionHTML(player, seasonObj) {
+  const exp = (player.draft && player.draft.year) ? (seasonObj.season - player.draft.year) : null;
+  if (exp == null) {
+    return '<div class="compSection"><h3>Similar players</h3><p class="compNote">Can\'t compute experience-matched comps without draft info for this player.</p></div>';
+  }
+  let pool = COMP_POOL.filter(r => r.pos === player.pos && r.exp === exp);
+  if (pool.length < 3) pool = COMP_POOL.filter(r => r.pos === player.pos && Math.abs(r.exp - exp) <= 1);
+  pool = pool.filter(r => normalize(r.name) !== normalize(player.name) || r.season !== seasonObj.season);
+  pool = [...pool].sort((a, b) => Math.abs(a.ppg - seasonObj.ppg) - Math.abs(b.ppg - seasonObj.ppg)).slice(0, 5);
+
+  if (pool.length === 0) {
+    return '<div class="compSection"><h3>Similar players</h3><p class="compNote">Not enough historical data to find comps for this season.</p></div>';
+  }
+
+  const rows = pool.map(c => {
+    const diff = c.nextPpg - c.ppg;
+    const arrow = diff >= 0 ? '&#9650;' : '&#9660;';
+    const cls = diff >= 0 ? 'up' : 'down';
+    return '<div class="compRow2"><div><span class="compName">' + c.name + '</span> <span class="compDetail">' + c.season + ', ' + c.ppg.toFixed(1) + ' ppg (yr ' + (c.exp+1) + ')</span></div>' +
+      '<div class="compOutcome ' + cls + '">' + arrow + ' ' + c.nextPpg.toFixed(1) + ' next szn</div></div>';
+  }).join('');
+
+  return '<div class="compSection"><h3>Similar players, same experience level</h3>' +
+    '<p class="compNote">Real historical players at the same position and career stage with a similar per-game rate that season, and what they actually did the following year.</p>' +
+    rows + '</div>';
+}
+
+/* ---------- Rookie comp tool ---------- */
+function pickBucketWindow(pick) {
+  if (pick <= 10) return 5;
+  if (pick <= 32) return 8;
+  if (pick <= 100) return 15;
+  return 30;
+}
+
+function rookieCompSectionHTML(player) {
+  const d = player.draft;
+  if (!d || !d.pick) {
+    return '<div class="compSection"><h3>Similar draft capital</h3><p class="compNote">No draft record for this player (likely undrafted), so there\'s no draft-capital comp to show.</p></div>';
+  }
+  const window = pickBucketWindow(d.pick);
+  let pool = ROOKIE_COMP_POOL.filter(r => r.pos === player.pos && Math.abs(r.pick - d.pick) <= window);
+  pool = [...pool].sort((a, b) => Math.abs(a.pick - d.pick) - Math.abs(b.pick - d.pick)).slice(0, 6);
+
+  if (pool.length === 0) {
+    return '<div class="compSection"><h3>Similar draft capital</h3><p class="compNote">Not enough historical picks in this range to build a comparison yet.</p></div>';
+  }
+
+  const rows = pool.map(c => {
+    const label = c.games < 6 ? 'limited action (' + c.games + ' gm)' : c.rookiePpg.toFixed(1) + ' ppg (' + c.pos + c.rookieRank + ')';
+    return '<div class="compRow2"><div><span class="compName">' + c.name + '</span> <span class="compDetail">' + c.year + ' draft, pick ' + c.pick + '</span></div>' +
+      '<div class="compOutcome" style="color:var(--ink);">' + label + '</div></div>';
+  }).join('');
+
+  return '<div class="compSection"><h3>Similar draft capital</h3>' +
+    '<p class="compNote">Real players picked around the same slot (pick ' + d.pick + '), and what they actually did as rookies.</p>' +
+    rows + '</div>';
+}
+
+renderGrid();
+</script>
+</body>
+</html>

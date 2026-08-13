@@ -51,6 +51,7 @@
   <div class="sidebarLogo"><img src="assets/sidebar-logo.png" alt="Snap Rank Fantasy"></div>
   <nav class="sidebarNav">
     <a href="index.html" class="sidebarNavLink active">Rank Players</a>
+    <a href="stats.html" class="sidebarNavLink">Stats Hub</a>
     <a href="about.html" class="sidebarNavLink">About</a>
   </nav>
   <div class="sidebarSection">
@@ -94,11 +95,6 @@
       <button class="btn primary" id="resumeBtn">Resume</button>
       <button class="btn secondary" id="discardResumeBtn">Discard</button>
     </div>
-  </div>
-  <div class="mergeWarning hidden" id="mergeWarning">
-    &#9888; Couldn't reach the live roster feed, so this session is missing 2026 rookies and any recent trades &mdash;
-    running on last season's stats only. Try reloading, and make sure you're viewing this over http(s):// rather than
-    opening the file directly.
   </div>
 
   <p class="startLabel">STEP 1 &middot; POSITION</p>
@@ -867,8 +863,12 @@ function playerCardHTML(player, isWinner) {
   const colors = TEAM_COLORS[player.team] || TEAM_COLORS.FA;
   const [primary, secondary] = colors;
   const badgeText = teamTextColor(secondary);
+  const headshotHTML = player.headshot
+    ? '<img class="headshot" src="' + player.headshot + '" alt="" onerror="this.style.display=\'none\'">'
+    : '';
   return '<div class="pcard' + (isWinner ? ' won' : '') + '" data-uid="' + player.uid + '">' +
     '<div class="teamStripe" style="background:' + primary + '"></div>' +
+    headshotHTML +
     '<span class="teamBadge" style="background:' + secondary + ';color:' + badgeText + '">' + player.team + '</span>' +
     '<div class="name display">' + player.name + '</div>' +
     '<div class="pos">' + posLabel + '</div>' +
@@ -1272,16 +1272,11 @@ function generateCheatSheetPDF() {
   doc.save('snap-rank-fantasy-cheat-sheet.pdf');
 }
 
-/* ---------- Sleeper roster merge ----------
-   POSITION_DATA above is the nflverse stats-based pool (players who recorded
-   stats last season). Rookies and players who missed all of last season have
-   no stats entry there. This fetches Sleeper's free, keyless full roster
-   list and merges it in, so nobody currently on an NFL roster is missing
-   from the pool -- players without a stats match just show as "new to the
-   league" instead of a stat line, and the user's own ranking handles the rest. */
-
-const SLEEPER_CACHE_KEY = 'srf_player_pool_v3'; // bump this suffix any time POSITION_DATA changes, to invalidate old cached merges
-const SLEEPER_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours, matches Sleeper's "once per day" guidance
+/* ---------- Rookie/draft-capital seeding ----------
+   Everyone currently on an NFL roster (including rookies and anyone with
+   no stats yet) ships fully baked into data.js, refreshed on a schedule.
+   Players without a stats match get a "New to the league" label and get
+   seeded into the ranked pool using draft capital instead (see below). */
 
 function normalizeName(name) {
   return (name || '')
@@ -1293,7 +1288,7 @@ function normalizeName(name) {
 }
 
 /* Nickname-aware variant, used only for matching against the draft-pick
-   lookup (Sleeper's roster names and draft records don't always agree on
+   lookup (roster names and draft records don't always agree on
    Kenny vs Kenneth, etc.) -- kept separate from normalizeName so uid
    generation stays untouched and can't develop new collisions. */
 function normalizeForDraftLookup(name) {
@@ -1336,94 +1331,10 @@ function getRookieRankRange(player, pos) {
   return entry ? { low: entry.low, high: entry.high } : null;
 }
 
-async function fetchSleeperPosition(pos) {
-  const res = await fetch('https://api.sleeper.app/v1/players/nfl?position=' + pos + '&active=true');
-  if (!res.ok) throw new Error('Sleeper fetch failed: ' + res.status);
-  return res.json();
-}
-
-async function mergeSleeperRoster() {
-  // Serve from cache if fresh
-  try {
-    const cached = JSON.parse(localStorage.getItem(SLEEPER_CACHE_KEY) || 'null');
-    if (cached && Date.now() - cached.ts < SLEEPER_CACHE_TTL_MS) {
-      Object.assign(POSITION_DATA, cached.data);
-      return { ok: true };
-    }
-  } catch (e) { /* corrupt cache, ignore and refetch */ }
-
-  const merged = {};
-  let anyFailed = false;
-  for (const pos of POSITION_ORDER) {
-    let sleeperMap;
-    try {
-      sleeperMap = await fetchSleeperPosition(pos);
-    } catch (e) {
-      console.warn('Sleeper fetch failed for', pos, '- falling back to stats-only pool', e);
-      anyFailed = true;
-      merged[pos] = POSITION_DATA[pos]; // graceful fallback, no rookies added for this position
-      continue;
-    }
-
-    const statsPlayers = POSITION_DATA[pos] || [];
-    const nameIndex = new Map();
-    statsPlayers.forEach(p => nameIndex.set(normalizeName(p.name), p));
-    const matchedNames = new Set();
-
-    const rosterEntries = Object.values(sleeperMap).filter(p => p.team); // must be on an active NFL roster
-
-    const unmatched = [];
-    rosterEntries.forEach(sp => {
-      const fullName = (sp.first_name || '') + ' ' + (sp.last_name || '');
-      const norm = normalizeName(fullName);
-      const statMatch = nameIndex.get(norm);
-      const draftKey = normalizeForDraftLookup(fullName) + '|' + pos;
-      const draftInfo = DRAFT_INFO_RECENT[draftKey] || null;
-      if (statMatch) {
-        matchedNames.add(norm);
-        // Team may have changed since last season's stats -- trust Sleeper's current team
-        statMatch.team = sp.team;
-        if (!statMatch.draft && draftInfo) statMatch.draft = draftInfo; // fill in if the offline bake missed it
-      } else {
-        unmatched.push({
-          name: fullName.trim(),
-          team: sp.team,
-          ppg: null,
-          stats: null,
-          hasStats: false,
-          draft: draftInfo,
-          depthOrder: (sp.depth_chart_order == null) ? 99 : sp.depth_chart_order,
-        });
-      }
-    });
-
-    unmatched.sort((a, b) => a.depthOrder - b.depthOrder || a.name.localeCompare(b.name));
-
-    const combined = statsPlayers.concat(unmatched);
-    combined.forEach((p, i) => { p.id = i; if (p.hasStats === undefined) p.hasStats = true; });
-    merged[pos] = combined;
-  }
-
-  Object.assign(POSITION_DATA, merged);
-  if (!anyFailed) {
-    // Only cache complete, successful merges -- a partial/failed attempt should
-    // always retry fresh next load rather than getting stuck for 24 hours.
-    try {
-      localStorage.setItem(SLEEPER_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: merged }));
-    } catch (e) { /* storage full or unavailable, non-fatal */ }
-  }
-  return { ok: !anyFailed };
-}
-
-async function initPlayerPool() {
-  let result = { ok: true };
-  try {
-    result = await mergeSleeperRoster();
-  } catch (e) {
-    console.warn('Sleeper merge failed entirely, using nflverse stats-only pool', e);
-    result = { ok: false };
-  }
-  document.getElementById('mergeWarning').classList.toggle('hidden', result.ok);
+function initPlayerPool() {
+  // Player pool (including current-season rookies and roster moves) now
+  // ships fully baked into data.js, refreshed on a schedule -- no live
+  // fetch needed at page load anymore.
   buildStartScreen();
 }
 
@@ -1492,7 +1403,7 @@ initPlayerPool();
 </script>
 
 <footer class="siteFooter">
-  Snap Rank Fantasy is an independent, fan-made tool and is not affiliated with, endorsed by, or sponsored by the NFL, NFLPA, or any NFL team, player, or league. All team names, logos, and colors are property of their respective owners and are used here for identification purposes only. Player statistics and schedule data courtesy of <a href="https://nflverse.nflverse.com/" target="_blank" rel="noopener">nflverse</a> (CC-BY 4.0). Roster data courtesy of <a href="https://sleeper.com" target="_blank" rel="noopener">Sleeper</a>. For entertainment and informational purposes only &mdash; not betting or financial advice.
+  Snap Rank Fantasy is an independent, fan-made tool and is not affiliated with, endorsed by, or sponsored by the NFL, NFLPA, or any NFL team, player, or league. All team names, logos, and colors are property of their respective owners and are used here for identification purposes only. Player statistics, schedule, and roster data courtesy of <a href="https://nflverse.nflverse.com/" target="_blank" rel="noopener">nflverse</a> (CC-BY 4.0). For entertainment and informational purposes only &mdash; not betting or financial advice.
 </footer>
 
 </div>

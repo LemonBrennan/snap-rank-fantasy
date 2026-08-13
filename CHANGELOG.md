@@ -2,6 +2,21 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.09.1 — 2026-08-13
+
+- **Fixed: 128 players were showing stale teams** — the automated data build only used the current-roster file to *add* brand-new players (rookies), but never used it to *update* the team of anyone who already had 2025 stats. So anyone traded or signed elsewhere since their 2025 season kept showing their old team indefinitely. Caught via three real examples (Travis Etienne → now correctly New Orleans, Rico Dowdle → Pittsburgh, Kenny Gainwell → Tampa Bay) and fixed for everyone, not just those three
+- **A second bug found while fixing the first**: Kenny Gainwell specifically still showed the wrong team even after the first fix, because the correction logic matched names literally ("Kenny" vs. the roster's "Kenneth") instead of using the nickname-aware matching already used elsewhere in the pipeline. Fixed the same way draft-info matching already handles this
+- Verified: 128 corrections applied, a stable player with no real move (Christian McCaffrey) confirmed unaffected, and all team codes still valid
+- `data.js` regenerated with the fix; `build_data.py` updated so future automated refreshes won't reintroduce this
+
+## v0.09 — 2026-08-13
+
+- **New: `ranking_entries` table** (`supabase-schema-ranking-entries.sql`) — one row per player per ranking, instead of everyone's picks being buried inside one big bundle each. This is what makes "what does everyone think of this player" a fast, simple question instead of an impossible one
+- **New: `community_averages` view** — a safe, public-readable aggregate (average rank, number of rankers, best/worst rank per player) that never exposes which individual user picked what. This is the actual data source the future "community average" display will read from
+- Save logic now populates this automatically alongside the existing save — no separate action needed, it just happens
+- **Verified re-saving doesn't duplicate**: finished a 5-player ranking (5 entries created), then reordered it — still exactly 5 entries afterward, correctly reflecting the new order, not 10
+- This table alone doesn't change anything visible on the site yet — it's the data plumbing the community-average feature will be built on top of next
+
 ## v0.08 — 2026-08-13
 
 - **New: "My Rankings" panel** (`my-rankings.js`) — a link next to Log Out (only shown once logged in) opens a list of every ranking you've saved to your account

@@ -40,9 +40,47 @@ async function syncSessionToCloud(snapshot) {
         session_data: snapshot,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id,position,format,mode,season,week' });
-    if (error) console.warn('Cloud save failed:', error.message);
+    if (error) { console.warn('Cloud save failed:', error.message); return; }
+    await syncRankingEntries(snapshot, key);
   } catch (e) {
     console.warn('Cloud save failed:', e);
+  }
+}
+
+/* Keeps the one-row-per-player table in sync with the current ranked list,
+   so "what does everyone think of this player" can be answered with a
+   simple, fast query instead of unpacking every user's saved bundle.
+   Strategy: clear out this exact ranking's old entries, then write the
+   current order fresh -- simpler and safer than trying to patch individual
+   rows when players can be added, removed, or reordered between saves. */
+async function syncRankingEntries(snapshot, key) {
+  try {
+    await supabaseClient
+      .from('ranking_entries')
+      .delete()
+      .eq('user_id', currentUser.id)
+      .eq('board', key.position)
+      .eq('format', key.format)
+      .eq('mode', key.mode)
+      .eq('season', key.season)
+      .eq('week', key.week);
+
+    if (!snapshot.ranked || snapshot.ranked.length === 0) return;
+
+    const entries = snapshot.ranked.map((p, i) => ({
+      user_id: currentUser.id,
+      player_uid: p.uid,
+      player_name: p.name,
+      player_pos: p.pos || key.position,
+      board: key.position, rank: i + 1,
+      format: key.format, mode: key.mode, season: key.season, week: key.week,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabaseClient.from('ranking_entries').insert(entries);
+    if (error) console.warn('ranking_entries sync failed:', error.message);
+  } catch (e) {
+    console.warn('ranking_entries sync failed:', e);
   }
 }
 

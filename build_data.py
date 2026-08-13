@@ -242,6 +242,24 @@ for pos, players in position_data.items():
         if p['headshot']: hs_matched += 1
 print(f'Headshots matched to stats pool: {hs_matched}')
 
+# Build a current-team lookup from the roster file (this is "as of now,"
+# unlike the stats-derived team above, which reflects whoever a player
+# played for during the 2025 season -- stale for anyone traded or signed
+# elsewhere since). Used to correct every matching player's team, not just
+# to add brand-new ones.
+current_team_lookup = {}
+for _, r in roster.iterrows():
+    current_team_lookup[normalize_nick(r['full_name']) + '|' + r['position']] = r['team']
+
+team_corrections = 0
+for pos, players in position_data.items():
+    for p in players:
+        current_team = current_team_lookup.get(normalize_nick(p['name']) + '|' + pos)
+        if current_team and current_team != p['team']:
+            team_corrections += 1
+            p['team'] = current_team
+print(f'Team corrections applied (player moved since their 2025 stats): {team_corrections}')
+
 # Merge in current-roster players not already in the stats pool (rookies, etc.)
 added = 0
 for pos in POSITIONS:

@@ -211,13 +211,26 @@ roster = roster[roster['position'].isin(POSITIONS)]
 roster['team'] = roster['team'].replace(TEAM_REMAP)
 
 # ---------- 6. Player headshots ----------
+# ESPN's headshot CDN is used as the primary source rather than NFL.com's --
+# NFL's static image CDN has been unreliable for third-party embedding
+# (hotlink restrictions), while ESPN's is the CDN most fantasy sites use
+# specifically because it embeds reliably elsewhere. NFL.com's URL (if
+# present) is kept as a fallback for the small number of players with no
+# ESPN ID.
 players_master = fetch_csv('https://github.com/nflverse/nflverse-data/releases/download/players/players.csv', 'players.csv')
 headshot_by_pos = {}
 headshot_by_name = {}
 for _, row in players_master.iterrows():
-    if pd.notna(row.get('headshot')):
-        headshot_by_pos[normalize(row['display_name']) + '|' + str(row.get('position',''))] = row['headshot']
-        headshot_by_name[normalize(row['display_name'])] = row['headshot']
+    espn_id = row.get('espn_id')
+    nfl_headshot = row.get('headshot')
+    url = None
+    if pd.notna(espn_id):
+        url = f'https://a.espncdn.com/i/headshots/nfl/players/full/{int(espn_id)}.png'
+    elif pd.notna(nfl_headshot):
+        url = nfl_headshot
+    if url:
+        headshot_by_pos[normalize(row['display_name']) + '|' + str(row.get('position',''))] = url
+        headshot_by_name[normalize(row['display_name'])] = url
 
 def get_headshot(name, pos):
     return headshot_by_pos.get(normalize(name) + '|' + pos) or headshot_by_name.get(normalize(name))

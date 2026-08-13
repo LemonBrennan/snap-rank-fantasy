@@ -9,7 +9,8 @@ All notable changes to Snap Rank Fantasy, in plain English, newest first.
 - **Color-coded stat ranks** (green = elite, red = poor) for every stat, computed against the full league at that position that season
 - **Veteran comp tool** — for any established player/season, shows 5 real historical players at the same position and career stage with a similar per-game rate, and what they *actually* did the following year (verified: real 9th-year RB comps all showing realistic decline, not cherry-picked outcomes)
 - **Rookie comp tool** — for anyone with no NFL stats yet, shows real historical players drafted around the same slot and what they did as rookies (verified against Jeremiyah Love, pick 3 — real comps include both hits like Ezekiel Elliott and busts like Cedric Benson)
-- Known limitation: the three new data files powering this (`player-history.js`, `comp-pool.js`, `rookie-comp-pool.js`) are static snapshots, not yet part of the automated weekly refresh — a follow-up task, not forgotten
+- **Fixed: player headshots not displaying** — switched from NFL.com's image CDN to ESPN's (95.9% coverage in the current pool, NFL.com kept as fallback), since ESPN's CDN is the one most third-party fantasy sites use specifically because it embeds reliably elsewhere. Not independently verified in a live browser (I can't load external images from my build environment) — please confirm this actually fixed it once deployed
+- Known limitation: the three new data files powering the Stats Hub (`player-history.js`, `comp-pool.js`, `rookie-comp-pool.js`) are static snapshots, not yet part of the automated weekly refresh — a follow-up task, not forgotten
 
 ## v0.02 — 2026-08-12
 

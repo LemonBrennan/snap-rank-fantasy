@@ -2,6 +2,20 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.08 — 2026-08-13
+
+- **New: "My Rankings" panel** (`my-rankings.js`) — a link next to Log Out (only shown once logged in) opens a list of every ranking you've saved to your account
+- Each saved ranking shows its position/format/mode, whether it's finished or still in progress, and when it was last updated
+- **Resume** — continue exactly where you left off, including using "search to add a missing player" the same way as any other ranking, since resuming reuses the exact same mechanism as everywhere else on the site
+- **Re-rank** — start that same position/format/mode completely fresh, if you'd rather redo it than continue it
+- **Delete** — remove a saved ranking permanently, with a confirmation prompt first
+- Tested end-to-end against a simulated backend: seeded two saved rankings, verified the list displays both correctly, then verified Resume, Re-rank, and Delete each work correctly against the database, including two real gaps caught and fixed in the test mock along the way (it wasn't matching how the real Supabase client resolves queries or handles deletes) so this was a genuine test, not a false pass
+
+## v0.07.1 — 2026-08-13
+
+- **Fixed: every save created a duplicate row instead of updating one** — the `week` column was `NULL` for Rest-of-Season rankings, and Postgres never treats two `NULL`s as equal, so the "prevent duplicates" rule silently never applied. Fixed by using `0` (never a real week number) instead of `NULL`. Verified: 6 saves to the same ranking now correctly produce 1 row instead of 6
+- **`cleanup-duplicates.sql`** — new one-time script to remove the duplicate rows already created by this bug and normalize existing data to match the fix. Run once in the SQL Editor, then this won't be needed again
+
 ## v0.07 — 2026-08-13
 
 - **New: cloud-saved rankings** — logged-in users' rankings now save to their account (Supabase), not just their browser. Requires running `supabase-schema.sql` once in your Supabase SQL Editor before this works (creates the `user_rankings` table with Row Level Security, so each user can only ever see their own data)

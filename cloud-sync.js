@@ -18,7 +18,12 @@ function cloudKeyForCurrentSession() {
     format: sessionFormat,
     mode: sessionMode,
     season: CLOUD_SEASON,
-    week: sessionMode === 'WEEKLY' ? sessionWeek : null,
+    // 0 (not null) for Rest-of-Season -- Postgres treats every NULL as
+    // distinct from every other NULL, which silently breaks the unique
+    // constraint (and upsert's conflict detection) for any nullable
+    // column. 0 is never a real NFL week number, so it's a safe stand-in
+    // for "not applicable."
+    week: sessionMode === 'WEEKLY' ? sessionWeek : 0,
   };
 }
 

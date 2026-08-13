@@ -28,11 +28,18 @@ function renderAuthWidget() {
   if (!el) return;
 
   if (currentUser) {
+    const myRankingsLink = (typeof openMyRankingsModal === 'function')
+      ? '<button class="authMyRankingsBtn" id="authMyRankingsBtn">My Rankings</button>'
+      : '';
     el.innerHTML =
       '<div class="authLoggedIn">' +
         '<div class="authEmail" title="' + currentUser.email + '">' + currentUser.email + '</div>' +
+        myRankingsLink +
         '<button class="authLogoutBtn" id="authLogoutBtn">Log out</button>' +
       '</div>';
+    if (typeof openMyRankingsModal === 'function') {
+      document.getElementById('authMyRankingsBtn').addEventListener('click', openMyRankingsModal);
+    }
     document.getElementById('authLogoutBtn').addEventListener('click', async () => {
       await supabaseClient.auth.signOut();
     });

@@ -41,14 +41,23 @@
 </div>
 
 <div class="main">
-  <div class="statsControls">
+  <div class="statsControls" style="flex-direction:column; align-items:stretch;">
     <input type="text" id="statsSearch" class="statsSearchInput" placeholder="Search for a player by name&hellip;" autocomplete="off">
-    <div class="statsPosFilters" id="statsPosFilters">
-      <div class="countChip selected" data-pos="ALL">All</div>
-      <div class="countChip" data-pos="RB">RB</div>
-      <div class="countChip" data-pos="QB">QB</div>
-      <div class="countChip" data-pos="WR">WR</div>
-      <div class="countChip" data-pos="TE">TE</div>
+    <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
+      <div class="statsPosFilters" id="statsFormatFilters">
+        <span class="statsFilterLabel">Format:</span>
+        <div class="countChip selected" data-format="ppr">Full PPR</div>
+        <div class="countChip" data-format="half">Half PPR</div>
+        <div class="countChip" data-format="standard">Standard</div>
+      </div>
+      <div class="statsPosFilters" id="statsPosFilters">
+        <span class="statsFilterLabel">Position:</span>
+        <div class="countChip selected" data-pos="ALL">All</div>
+        <div class="countChip" data-pos="RB">RB</div>
+        <div class="countChip" data-pos="QB">QB</div>
+        <div class="countChip" data-pos="WR">WR</div>
+        <div class="countChip" data-pos="TE">TE</div>
+      </div>
     </div>
   </div>
   <p class="statsResultCount" id="statsResultCount"></p>
@@ -94,6 +103,7 @@ POSITION_ORDER.forEach(pos => {
 
 let currentFilterPos = 'ALL';
 let currentQuery = '';
+let currentFormat = 'ppr';
 
 function teamTextColor(hex) {
   const c = hex.replace('#', '');
@@ -124,8 +134,9 @@ function renderGrid() {
     const [primary, secondary] = colors;
     const textColor = teamTextColor(primary);
     const mutedText = textColor === '#FFFFFF' ? 'rgba(255,255,255,0.75)' : 'rgba(42,24,16,0.65)';
+    const formatLabel = currentFormat === 'ppr' ? 'PPR' : currentFormat === 'half' ? 'Half PPR' : 'Standard';
     const ppgLine = (p.hasStats !== false && p.stats)
-      ? '<div class="miniPpg" style="color:' + textColor + ';">' + computePoints(p.stats, 'ppr').toFixed(1) + ' pts/gm (2025)</div>'
+      ? '<div class="miniPpg" style="color:' + textColor + ';">' + computePoints(p.stats, currentFormat).toFixed(1) + ' pts/gm (2025, ' + formatLabel + ')</div>'
       : '<div class="miniPpg" style="color:' + mutedText + ';">New to the league</div>';
     return '<div class="statsCard" style="background:' + primary + ';border-color:' + secondary + ';" data-name="' + p.name.replace(/"/g,'&quot;') + '" data-pos="' + p.pos + '">' +
       hs +
@@ -160,6 +171,17 @@ document.getElementById('statsPosFilters').querySelectorAll('.countChip').forEac
     currentFilterPos = chip.dataset.pos;
     document.querySelectorAll('#statsPosFilters .countChip').forEach(c => c.classList.toggle('selected', c === chip));
     renderGrid();
+  });
+});
+document.getElementById('statsFormatFilters').querySelectorAll('.countChip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    currentFormat = chip.dataset.format;
+    document.querySelectorAll('#statsFormatFilters .countChip').forEach(c => c.classList.toggle('selected', c === chip));
+    renderGrid();
+    if (currentModalPlayer && !document.getElementById('modalOverlay').classList.contains('hidden')) {
+      const history = PLAYER_HISTORY[currentModalPlayer.name + '|' + currentModalPlayer.pos] || [];
+      if (history[currentModalSeasonIdx]) renderSeasonStats(currentModalPlayer, history[currentModalSeasonIdx]);
+    }
   });
 });
 
@@ -206,7 +228,13 @@ function renderModal(player, history) {
     return;
   }
 
-  html += '<div class="seasonSelectRow"><label for="seasonSelect">Season:</label><select id="seasonSelect"></select></div>';
+  html += '<div class="seasonSelectRow"><label for="seasonSelect">Season:</label><select id="seasonSelect"></select>' +
+    '<label for="modalFormatSelect" style="margin-left:14px;">Format:</label>' +
+    '<select id="modalFormatSelect">' +
+      '<option value="ppr"' + (currentFormat==='ppr'?' selected':'') + '>Full PPR</option>' +
+      '<option value="half"' + (currentFormat==='half'?' selected':'') + '>Half PPR</option>' +
+      '<option value="standard"' + (currentFormat==='standard'?' selected':'') + '>Standard</option>' +
+    '</select></div>';
   html += '<div class="statRankGrid" id="statRankGrid"></div>';
   html += '<div id="compSectionContainer"></div>';
 
@@ -220,14 +248,21 @@ function renderModal(player, history) {
     renderSeasonStats(player, history[currentModalSeasonIdx]);
   });
 
+  document.getElementById('modalFormatSelect').addEventListener('change', (e) => {
+    currentFormat = e.target.value;
+    document.querySelectorAll('#statsFormatFilters .countChip').forEach(c => c.classList.toggle('selected', c.dataset.format === currentFormat));
+    renderSeasonStats(player, history[currentModalSeasonIdx]);
+    renderGrid();
+  });
+
   renderSeasonStats(player, history[0]);
 }
 
 function renderSeasonStats(player, seasonObj) {
   const grid = document.getElementById('statRankGrid');
   const rankKeys = Object.keys(seasonObj.ranks || {});
+  const formatLabel = currentFormat === 'ppr' ? 'PPR' : currentFormat === 'half' ? 'Half PPR' : 'Standard';
   const displayVal = (key) => {
-    if (key === 'ppg') return seasonObj.ppg;
     const map = {
       passing_yards_pg: seasonObj.stats.passYds, passing_tds_pg: seasonObj.stats.passTds,
       completions_pg: seasonObj.stats.passComp, passing_interceptions_pg: seasonObj.stats.passInt,
@@ -236,19 +271,34 @@ function renderSeasonStats(player, seasonObj) {
     };
     return map[key];
   };
-  const labelFor = (key) => key === 'ppg' ? ('Points per game (' + seasonObj.season + ')') : (STAT_LABELS[key] || key);
 
-  grid.innerHTML = rankKeys.map(key => {
+  // Points-per-game row is built separately since it's format-dependent (both the
+  // value and the rank change based on scoring format), unlike the other stats.
+  const ppgVal = seasonObj.ppgByFormat[currentFormat];
+  const ppgRank = seasonObj.ppgRanks[currentFormat];
+  let rowsHTML = '';
+  if (ppgRank) {
+    const color = rankColor(ppgRank.rank, ppgRank.of);
+    rowsHTML += '<div class="statRankRow">' +
+      '<div class="statRankLabel">Points per game (' + seasonObj.season + ', ' + formatLabel + ') &mdash; ' + ppgVal.toFixed(1) + '</div>' +
+      '<div class="statRankValue"><span class="rankPill" style="background:' + color + '">#' + ppgRank.rank + '</span>' +
+      '<span class="statRankNum">of ' + ppgRank.of + '</span></div>' +
+    '</div>';
+  }
+
+  rowsHTML += rankKeys.map(key => {
     const r = seasonObj.ranks[key];
     const val = displayVal(key);
     const valStr = (val == null) ? '\u2014' : val.toFixed(1);
     const color = rankColor(r.rank, r.of);
     return '<div class="statRankRow">' +
-      '<div class="statRankLabel">' + labelFor(key) + ' &mdash; ' + valStr + '</div>' +
+      '<div class="statRankLabel">' + (STAT_LABELS[key] || key) + ' &mdash; ' + valStr + '</div>' +
       '<div class="statRankValue"><span class="rankPill" style="background:' + color + '">#' + r.rank + '</span>' +
       '<span class="statRankNum">of ' + r.of + '</span></div>' +
     '</div>';
   }).join('');
+
+  grid.innerHTML = rowsHTML;
 
   document.getElementById('compSectionContainer').innerHTML = veteranCompSectionHTML(player, seasonObj);
 }
@@ -259,21 +309,23 @@ function veteranCompSectionHTML(player, seasonObj) {
   if (exp == null) {
     return '<div class="compSection"><h3>Similar players</h3><p class="compNote">Can\'t compute experience-matched comps without draft info for this player.</p></div>';
   }
+  const myPpg = seasonObj.ppgByFormat[currentFormat];
   let pool = COMP_POOL.filter(r => r.pos === player.pos && r.exp === exp);
   if (pool.length < 3) pool = COMP_POOL.filter(r => r.pos === player.pos && Math.abs(r.exp - exp) <= 1);
   pool = pool.filter(r => normalize(r.name) !== normalize(player.name) || r.season !== seasonObj.season);
-  pool = [...pool].sort((a, b) => Math.abs(a.ppg - seasonObj.ppg) - Math.abs(b.ppg - seasonObj.ppg)).slice(0, 5);
+  pool = [...pool].sort((a, b) => Math.abs(a.ppg[currentFormat] - myPpg) - Math.abs(b.ppg[currentFormat] - myPpg)).slice(0, 5);
 
   if (pool.length === 0) {
     return '<div class="compSection"><h3>Similar players</h3><p class="compNote">Not enough historical data to find comps for this season.</p></div>';
   }
 
   const rows = pool.map(c => {
-    const diff = c.nextPpg - c.ppg;
+    const cPpg = c.ppg[currentFormat], cNext = c.nextPpg[currentFormat];
+    const diff = cNext - cPpg;
     const arrow = diff >= 0 ? '&#9650;' : '&#9660;';
     const cls = diff >= 0 ? 'up' : 'down';
-    return '<div class="compRow2"><div><span class="compName">' + c.name + '</span> <span class="compDetail">' + c.season + ', ' + c.ppg.toFixed(1) + ' ppg (yr ' + (c.exp+1) + ')</span></div>' +
-      '<div class="compOutcome ' + cls + '">' + arrow + ' ' + c.nextPpg.toFixed(1) + ' next szn</div></div>';
+    return '<div class="compRow2"><div><span class="compName">' + c.name + '</span> <span class="compDetail">' + c.season + ', ' + cPpg.toFixed(1) + ' ppg (yr ' + (c.exp+1) + ')</span></div>' +
+      '<div class="compOutcome ' + cls + '">' + arrow + ' ' + cNext.toFixed(1) + ' next szn</div></div>';
   }).join('');
 
   return '<div class="compSection"><h3>Similar players, same experience level</h3>' +

@@ -365,7 +365,8 @@
     border-radius: 8px; padding: 10px 14px; font-size: 15px; color: var(--ink); font-family: inherit;
   }
   .statsSearchInput:focus { outline: none; border-color: var(--oxblood); }
-  .statsPosFilters { display: flex; gap: 8px; flex-wrap: wrap; }
+  .statsPosFilters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .statsFilterLabel { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-right: 2px; }
   .statsResultCount { font-size: 13px; color: var(--ink-faint); margin-bottom: 14px; }
   .statsGrid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));

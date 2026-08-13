@@ -2,7 +2,15 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
-## v0.03 — 2026-08-13
+## v0.05 — 2026-08-13
+
+- **Fixed: Stats Hub was silently locked to PPR everywhere** — added a real Full PPR / Half PPR / Standard selector (on the browse grid, and again inside the player profile modal since the modal covers the page and the outer selector isn't clickable while it's open)
+- This wasn't just a label swap — **ranks now genuinely recompute per format**, since a player's rank shifts between scoring systems (verified: Christian McCaffrey's 2025 season is #1 in PPG for PPR and Half PPR, but #2 in Standard, because removing reception value changes his standing relative to other backs)
+- The veteran comp tool now matches and displays using whichever format is selected, not a hardcoded PPR number
+- Team-color player cards and the "(2025)" season label added to the Stats Hub grid and profile modal
+- Fixed player headshots not displaying — switched from NFL.com's CDN to ESPN's, which is more reliably embeddable on third-party sites
+
+## v0.04 — 2026-08-13
 
 - **New: Stats Hub** (`stats.html`) — search any player, filter by position, click through to a full profile
 - **Season-by-season history** with a dropdown to browse any year a player's played

@@ -95,6 +95,16 @@ POSITION_ORDER.forEach(pos => {
 let currentFilterPos = 'ALL';
 let currentQuery = '';
 
+function teamTextColor(hex) {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substr(0, 2), 16) / 255;
+  const g = parseInt(c.substr(2, 2), 16) / 255;
+  const b = parseInt(c.substr(4, 2), 16) / 255;
+  const lin = v => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  const lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return lum > 0.4 ? '#2A1810' : '#FFFFFF';
+}
+
 function renderGrid() {
   let list = allPlayers;
   if (currentFilterPos !== 'ALL') list = list.filter(p => p.pos === currentFilterPos);
@@ -110,11 +120,17 @@ function renderGrid() {
   const grid = document.getElementById('statsGrid');
   grid.innerHTML = list.map(p => {
     const hs = p.headshot ? '<img class="headshot" src="' + p.headshot + '" alt="" onerror="this.style.display=\'none\'">' : '';
-    const ppgLine = (p.hasStats !== false && p.stats) ? '<div class="miniPpg">' + computePoints(p.stats, 'ppr').toFixed(1) + ' pts/gm</div>' : '<div class="miniPpg" style="color:var(--ink-faint);">New to the league</div>';
-    return '<div class="statsCard" data-name="' + p.name.replace(/"/g,'&quot;') + '" data-pos="' + p.pos + '">' +
+    const colors = TEAM_COLORS[p.team] || TEAM_COLORS.FA;
+    const [primary, secondary] = colors;
+    const textColor = teamTextColor(primary);
+    const mutedText = textColor === '#FFFFFF' ? 'rgba(255,255,255,0.75)' : 'rgba(42,24,16,0.65)';
+    const ppgLine = (p.hasStats !== false && p.stats)
+      ? '<div class="miniPpg" style="color:' + textColor + ';">' + computePoints(p.stats, 'ppr').toFixed(1) + ' pts/gm (2025)</div>'
+      : '<div class="miniPpg" style="color:' + mutedText + ';">New to the league</div>';
+    return '<div class="statsCard" style="background:' + primary + ';border-color:' + secondary + ';" data-name="' + p.name.replace(/"/g,'&quot;') + '" data-pos="' + p.pos + '">' +
       hs +
-      '<div class="nm">' + p.name + '</div>' +
-      '<div class="meta">' + p.team + ' &middot; ' + p.pos + '</div>' +
+      '<div class="nm" style="color:' + textColor + ';">' + p.name + '</div>' +
+      '<div class="meta" style="color:' + mutedText + ';">' + p.team + ' &middot; ' + p.pos + '</div>' +
       ppgLine +
     '</div>';
   }).join('');
@@ -220,6 +236,7 @@ function renderSeasonStats(player, seasonObj) {
     };
     return map[key];
   };
+  const labelFor = (key) => key === 'ppg' ? ('Points per game (' + seasonObj.season + ')') : (STAT_LABELS[key] || key);
 
   grid.innerHTML = rankKeys.map(key => {
     const r = seasonObj.ranks[key];
@@ -227,7 +244,7 @@ function renderSeasonStats(player, seasonObj) {
     const valStr = (val == null) ? '\u2014' : val.toFixed(1);
     const color = rankColor(r.rank, r.of);
     return '<div class="statRankRow">' +
-      '<div class="statRankLabel">' + (STAT_LABELS[key] || key) + ' &mdash; ' + valStr + '</div>' +
+      '<div class="statRankLabel">' + labelFor(key) + ' &mdash; ' + valStr + '</div>' +
       '<div class="statRankValue"><span class="rankPill" style="background:' + color + '">#' + r.rank + '</span>' +
       '<span class="statRankNum">of ' + r.of + '</span></div>' +
     '</div>';

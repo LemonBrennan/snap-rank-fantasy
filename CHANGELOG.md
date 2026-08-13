@@ -2,6 +2,19 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.07 — 2026-08-13
+
+- **New: cloud-saved rankings** — logged-in users' rankings now save to their account (Supabase), not just their browser. Requires running `supabase-schema.sql` once in your Supabase SQL Editor before this works (creates the `user_rankings` table with Row Level Security, so each user can only ever see their own data)
+- **Cloud is authoritative once logged in** — if you have a ranking saved to your account, that's what loads, on any device or browser
+- **Automatic one-time upload** — if you ranked something before logging in (or on a browser that's never synced), logging in immediately uploads it to become your cloud copy, rather than requiring a second save
+- **Fixed: account email overflowing the sidebar** — the truncation CSS was missing a width to actually truncate against
+- Tested against a full simulated Supabase backend (auth + the database query layer): verified an anonymous ranking correctly uploads on login, and a cloud-saved ranking correctly offers to resume and restores exactly on a fresh page load (simulating a new device)
+- Not yet tested against the real Supabase project — same honest caveat as the accounts feature, please confirm once deployed
+
+## v0.06.1 — 2026-08-13
+
+- **Fixed: email confirmation links pointed to localhost instead of the real site** — Supabase projects default to `http://localhost:3000` as the "Site URL," which is why confirmation emails were sending people to a page that doesn't exist for them. Two changes: `auth.js` now explicitly tells Supabase where to redirect (`window.location.origin`, so it always matches wherever the site is actually running), and **the Supabase dashboard's Site URL / Redirect URLs need to be updated to `https://snap-rank-fantasy.com` manually** — this is a one-time dashboard setting, not something deploying new code fixes on its own
+
 ## v0.06 — 2026-08-13
 
 - **New: accounts** — Log In / Sign Up available from the sidebar on every page (`auth.js`, powered by Supabase). Sign up, confirm your email, log in, log out — all working

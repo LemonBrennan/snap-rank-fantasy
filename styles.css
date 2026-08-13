@@ -435,6 +435,7 @@
   .authEmail {
     font-size: 12px; color: var(--ink-soft); margin-bottom: 8px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    display: block; width: 100%; max-width: 100%; box-sizing: border-box;
   }
   .authLogoutBtn {
     background: none; border: 1px solid var(--oxblood-soft); color: var(--oxblood);

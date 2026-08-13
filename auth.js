@@ -14,10 +14,12 @@ async function initAuthWidget() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   currentUser = session ? session.user : null;
   renderAuthWidget();
+  document.dispatchEvent(new CustomEvent('authReady', { detail: { user: currentUser } }));
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     currentUser = session ? session.user : null;
     renderAuthWidget();
+    document.dispatchEvent(new CustomEvent('authStateChanged', { detail: { event, user: currentUser } }));
   });
 }
 
@@ -102,7 +104,10 @@ function renderAuthModalContent(statusMsg, statusIsError) {
 
     try {
       if (authMode === 'signup') {
-        const { error } = await supabaseClient.auth.signUp({ email, password });
+        const { error } = await supabaseClient.auth.signUp({
+          email, password,
+          options: { emailRedirectTo: window.location.origin + '/index.html' }
+        });
         if (error) throw error;
         renderAuthModalContent('Account created \u2014 check your email to confirm it before logging in.', false);
       } else {

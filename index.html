@@ -288,14 +288,21 @@ const COMPLETED_KEY = 'srf_completed_rankings_v1';
 
 function saveActiveSession() {
   if (!MODE) return;
+  const snapshot = {
+    MODE, selectedPos, selectedCount, sessionFormat, sessionMode, sessionWeek,
+    ranked, queue, challenger, lo, hi, comparisons, done, TOTAL,
+    positionLastPlayer, tierBreaks: Array.from(tierBreaks),
+    savedAt: Date.now(),
+  };
   try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({
-      MODE, selectedPos, selectedCount, sessionFormat, sessionMode, sessionWeek,
-      ranked, queue, challenger, lo, hi, comparisons, done, TOTAL,
-      positionLastPlayer, tierBreaks: Array.from(tierBreaks),
-      savedAt: Date.now(),
-    }));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(snapshot));
   } catch (e) { /* storage full or unavailable, non-fatal */ }
+
+  // Also push to the cloud if logged in (cloud-sync.js, only present on
+  // this page). Fire-and-forget -- never block the UI on a network call.
+  if (typeof syncSessionToCloud === 'function' && typeof currentUser !== 'undefined' && currentUser) {
+    syncSessionToCloud(snapshot);
+  }
 }
 
 function clearActiveSession() {
@@ -1412,6 +1419,7 @@ initPlayerPool();
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="auth.js"></script>
+<script src="cloud-sync.js"></script>
 <!-- Cloudflare Web Analytics -->
 <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "ddde4ba88b0c4ec9883d53946d6ae85f"}'></script>
 <!-- End Cloudflare Web Analytics -->

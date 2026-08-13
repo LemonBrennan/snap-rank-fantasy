@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Community Consensus — Snap Rank Fantasy</title>
+<link rel="canonical" href="https://snap-rank-fantasy.com/consensus.html">
+<meta name="description" content="See how the Snap Rank Fantasy community ranks every player, built from real submitted rankings.">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Community Consensus — Snap Rank Fantasy">
+<meta property="og:description" content="See how the Snap Rank Fantasy community ranks every player, built from real submitted rankings.">
+<meta property="og:image" content="assets/og-image.png">
+<meta property="og:url" content="https://snap-rank-fantasy.com/consensus.html">
+
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="512x512" href="assets/favicon-512.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="appLayout">
+<aside class="sidebar">
+  <div class="sidebarLogo"><img src="assets/sidebar-logo.png" alt="Snap Rank Fantasy"></div>
+  <nav class="sidebarNav">
+    <a href="index.html" class="sidebarNavLink">Rank Players</a>
+    <a href="stats.html" class="sidebarNavLink">Stats Hub</a>
+    <a href="consensus.html" class="sidebarNavLink active">Community Consensus</a>
+    <a href="about.html" class="sidebarNavLink">About</a>
+  </nav>
+  <div class="authWidgetWrap" id="authWidget"></div>
+</aside>
+<div class="pageContent">
+
+<div class="yardlines">
+  <div class="wrap">
+    <div class="eyebrow">SNAP RANK FANTASY &middot; 2026 SEASON</div>
+    <h1 class="display">Community Consensus</h1>
+    <p class="sub">How everyone else is ranking players, built from real submitted rankings &mdash; not just one person's opinion.</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="statsControls" style="flex-direction:column; align-items:stretch;">
+    <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
+      <div class="statsPosFilters" id="consensusFormatFilters">
+        <span class="statsFilterLabel">Format:</span>
+        <div class="countChip selected" data-format="ppr">Full PPR</div>
+        <div class="countChip" data-format="half">Half PPR</div>
+        <div class="countChip" data-format="standard">Standard</div>
+      </div>
+      <div class="statsPosFilters" id="consensusBoardFilters">
+        <span class="statsFilterLabel">Board:</span>
+        <div class="countChip selected" data-board="OVERALL">Overall</div>
+        <div class="countChip" data-board="RB">RB</div>
+        <div class="countChip" data-board="QB">QB</div>
+        <div class="countChip" data-board="WR">WR</div>
+        <div class="countChip" data-board="TE">TE</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="statsResultCount" id="consensusMeta"></p>
+  <div id="consensusList"></div>
+</div>
+
+<footer class="siteFooter">
+  Snap Rank Fantasy is an independent, fan-made tool and is not affiliated with, endorsed by, or sponsored by the NFL, NFLPA, or any NFL team, player, or league. All team names, logos, and colors are property of their respective owners and are used here for identification purposes only. Player statistics, schedule, and roster data courtesy of <a href="https://nflverse.nflverse.com/" target="_blank" rel="noopener">nflverse</a> (CC-BY 4.0). For entertainment and informational purposes only &mdash; not betting or financial advice.
+</footer>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="auth.js"></script>
+<script>
+
+const MIN_RANKERS_FOR_CONFIDENCE = 5; // below this, flag the result as still thin rather than hide it
+
+let currentBoard = 'OVERALL';
+let currentFormat = 'ppr';
+let allBoardsData = {}; // { RB: [...], QB: [...], ... } for the currently selected format
+
+async function loadConsensusData() {
+  const listEl = document.getElementById('consensusList');
+  listEl.innerHTML = '<p class="compNote">Loading&hellip;</p>';
+
+  const { data, error } = await supabaseClient
+    .from('community_averages')
+    .select('*')
+    .eq('format', currentFormat)
+    .eq('mode', 'ROS')
+    .eq('season', 2026)
+    .eq('week', 0);
+
+  if (error) {
+    listEl.innerHTML = '<p class="compNote">Couldn\u2019t load consensus data right now. Try again in a moment.</p>';
+    return;
+  }
+
+  allBoardsData = {};
+  (data || []).forEach(row => {
+    if (!allBoardsData[row.board]) allBoardsData[row.board] = [];
+    allBoardsData[row.board].push(row);
+  });
+  Object.keys(allBoardsData).forEach(board => {
+    allBoardsData[board].sort((a, b) => a.avg_rank - b.avg_rank);
+  });
+
+  renderConsensusList();
+}
+
+function renderConsensusList() {
+  const listEl = document.getElementById('consensusList');
+  const metaEl = document.getElementById('consensusMeta');
+  const rows = allBoardsData[currentBoard] || [];
+
+  if (rows.length === 0) {
+    metaEl.textContent = '';
+    const boardLabel = currentBoard === 'OVERALL' ? 'an Overall' : 'a ' + currentBoard;
+    listEl.innerHTML = '<p class="compNote">No community data yet for ' + boardLabel + ' board in this format. '
+      + 'This fills in as more people finish rankings while logged in &mdash; check back soon, or be the first.</p>';
+    return;
+  }
+
+  const totalRankers = Math.max(...rows.map(r => r.num_rankers));
+  metaEl.textContent = rows.length + ' players ranked by the community so far (up to ' + totalRankers + ' ranker' + (totalRankers === 1 ? '' : 's') + ' per player)';
+
+  // For the Overall board, also look up each player's own position-specific
+  // consensus rank, if one exists, as helpful secondary context.
+  const posBoardCache = {};
+
+  listEl.innerHTML = '<ol class="boardList">' + rows.map((r, i) => {
+    const thin = r.num_rankers < MIN_RANKERS_FOR_CONFIDENCE;
+    let posRankHTML = '';
+    if (currentBoard === 'OVERALL' && r.player_pos) {
+      const posRows = allBoardsData[r.player_pos] || [];
+      const posMatch = posRows.find(p => p.player_uid === r.player_uid);
+      if (posMatch) {
+        const posIdx = posRows.indexOf(posMatch);
+        posRankHTML = '<span class="tm" style="margin-left:6px;">' + r.player_pos + posIdx + 1 + '</span>';
+      }
+    }
+    return '<li class="boardRow">' +
+      '<span class="rk display">' + (i + 1) + '</span>' +
+      (currentBoard === 'OVERALL' ? '<span class="posTag">' + r.player_pos + '</span>' : '') +
+      '<span class="nm">' + r.player_name + '</span>' +
+      posRankHTML +
+      '<span class="tm" style="margin-left:auto;">avg ' + r.avg_rank.toFixed(1) + ' &middot; range ' + r.best_rank + '&ndash;' + r.worst_rank + '</span>' +
+      '<span class="tm" style="min-width:70px; text-align:right;' + (thin ? ' color:var(--mustard);' : '') + '">' + r.num_rankers + ' ranker' + (r.num_rankers === 1 ? '' : 's') + (thin ? ' &#9888;' : '') + '</span>' +
+    '</li>';
+  }).join('') + '</ol>' +
+  (rows.some(r => r.num_rankers < MIN_RANKERS_FOR_CONFIDENCE)
+    ? '<p class="compNote" style="margin-top:12px;">&#9888; Players with fewer than ' + MIN_RANKERS_FOR_CONFIDENCE + ' rankers so far are flagged &mdash; their consensus rank may shift a lot as more people rank them.</p>'
+    : '');
+}
+
+document.getElementById('consensusFormatFilters').querySelectorAll('.countChip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    currentFormat = chip.dataset.format;
+    document.querySelectorAll('#consensusFormatFilters .countChip').forEach(c => c.classList.toggle('selected', c === chip));
+    loadConsensusData();
+  });
+});
+document.getElementById('consensusBoardFilters').querySelectorAll('.countChip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    currentBoard = chip.dataset.board;
+    document.querySelectorAll('#consensusBoardFilters .countChip').forEach(c => c.classList.toggle('selected', c === chip));
+    renderConsensusList();
+  });
+});
+
+loadConsensusData();
+</script>
+</body>
+</html>

@@ -52,6 +52,7 @@
   <nav class="sidebarNav">
     <a href="index.html" class="sidebarNavLink active">Rank Players</a>
     <a href="stats.html" class="sidebarNavLink">Stats Hub</a>
+    <a href="consensus.html" class="sidebarNavLink">Community Consensus</a>
     <a href="about.html" class="sidebarNavLink">About</a>
   </nav>
   <div class="sidebarSection">
@@ -146,6 +147,7 @@
     <button class="btn primary hidden" id="downloadBtn">&#8681; Download rankings</button>
     <button class="btn primary hidden" id="cheatSheetBtn">&#8681; Download Cheat Sheet (PDF)</button>
     <button class="btn primary hidden" id="excelBtn">&#8681; Download Rankings (Excel)</button>
+    <button class="btn secondary hidden" id="addMoreBtn">+ Add More Players</button>
     <button class="btn secondary" id="changeSetupBtn">&#8635; Change position / count</button>
   </div>
   <div class="toast hidden" id="toast"></div>
@@ -226,6 +228,45 @@ function getYouthBoost(player) {
   return 1;
 }
 
+/* ---------- Community consensus seeding ---------- */
+/* Fetched once at page load (public data, works whether logged in or not).
+   Below the confidence threshold for a given player, this has zero effect
+   -- seeding falls back to exactly what it did before. Above it, the real
+   crowd average takes over as the sort key instead of raw 2025 PPG. */
+
+const MIN_RANKERS_FOR_SEEDING = 5;
+let COMMUNITY_CONSENSUS = {}; // 'pos|format' -> { player_uid: { avg_rank, num_rankers } }
+
+async function loadCommunityConsensus() {
+  if (typeof supabaseClient === 'undefined') return; // auth.js didn't load; degrade gracefully
+  try {
+    const { data, error } = await supabaseClient
+      .from('community_averages')
+      .select('board,format,player_uid,avg_rank,num_rankers')
+      .eq('mode', 'ROS')
+      .eq('season', 2026)
+      .eq('week', 0);
+    if (error || !data) return;
+    const byKey = {};
+    data.forEach(row => {
+      const key = row.board + '|' + row.format;
+      if (!byKey[key]) byKey[key] = {};
+      byKey[key][row.player_uid] = { avg_rank: row.avg_rank, num_rankers: row.num_rankers };
+    });
+    COMMUNITY_CONSENSUS = byKey;
+  } catch (e) {
+    console.warn('Community consensus fetch failed, using stats-based seeding only:', e);
+  }
+}
+
+function getConsensusRank(uid, pos, format) {
+  const posData = COMMUNITY_CONSENSUS[pos + '|' + format];
+  if (!posData) return null;
+  const entry = posData[uid];
+  if (!entry || entry.num_rankers < MIN_RANKERS_FOR_SEEDING) return null;
+  return entry.avg_rank;
+}
+
 function getRankedPool(pos, mode, week, format) {
   const all = POSITION_DATA[pos] || [];
   const withStats = all.filter(p => p.hasStats !== false);
@@ -247,6 +288,16 @@ function getRankedPool(pos, mode, week, format) {
   });
 
   const allScored = scoredStats.concat(scoredNoStats);
+
+  // Community consensus data is currently Rest-of-Season only.
+  if (mode !== 'WEEKLY') {
+    allScored.forEach(s => {
+      const uid = pos + '-' + normalizeName(s.player.name);
+      const consensusRank = getConsensusRank(uid, pos, format);
+      if (consensusRank != null) s.rank = consensusRank;
+    });
+  }
+
   allScored.sort((a, b) => a.rank - b.rank);
 
   const combined = allScored.map(s => ({ ...s.player, _weeklyInfo: s.weeklyInfo, pos: pos, uid: pos + '-' + normalizeName(s.player.name) }));
@@ -647,6 +698,84 @@ function loadNextChallenger() {
   render();
 }
 
+/* ---------- Add More Players ---------- */
+/* Lets someone extend an already-finished ranking with the next batch of
+   recommended players, comparing each new one against the FULL existing
+   list rather than starting over -- reuses the exact same insert/compare
+   engine as the initial ranking, just fed a fresh, larger source pool. */
+
+function getAddMoreAvailableCount() {
+  if (!done || !MODE) return 0;
+  if (MODE === 'SINGLE') {
+    const fullPool = getRankedPool(selectedPos, sessionMode, sessionWeek, sessionFormat);
+    const existingUids = new Set(ranked.map(p => p.uid));
+    return fullPool.filter(p => !existingUids.has(p.uid)).length;
+  } else {
+    // OVERALL: bounded by how much deeper each position's completed board goes
+    const biggerPool = buildOverallPool(TOTAL + 500); // 500 is just a generous ceiling to probe availability
+    const existingUids = new Set(ranked.map(p => p.uid));
+    return biggerPool.filter(p => !existingUids.has(p.uid)).length;
+  }
+}
+
+function addMorePlayers(count) {
+  const existingUids = new Set(ranked.map(p => p.uid));
+  let nextBatch;
+  if (MODE === 'SINGLE') {
+    const fullPool = getRankedPool(selectedPos, sessionMode, sessionWeek, sessionFormat);
+    nextBatch = fullPool.filter(p => !existingUids.has(p.uid)).slice(0, count);
+  } else {
+    const biggerPool = buildOverallPool(TOTAL + count);
+    nextBatch = biggerPool.filter(p => !existingUids.has(p.uid));
+  }
+  if (nextBatch.length === 0) return;
+  queue = nextBatch;
+  TOTAL += nextBatch.length;
+  done = false;
+  challenger = null;
+  lastPickId = null;
+  loadNextChallenger();
+}
+
+function openAddMoreModal() {
+  const available = getAddMoreAvailableCount();
+  if (available === 0) return;
+  let overlay = document.getElementById('addMoreOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'addMoreOverlay';
+    overlay.className = 'modalOverlay hidden';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAddMoreModal(); });
+  }
+  const defaultCount = Math.min(10, available);
+  overlay.innerHTML =
+    '<div class="modalBox" style="max-width:380px;">' +
+      '<button class="modalCloseBtn" id="addMoreCloseBtn">&times;</button>' +
+      '<h2 class="display" style="font-size:1.5rem; margin-bottom:10px;">Add More Players</h2>' +
+      '<p class="compNote" style="margin-bottom:16px;">' + available + ' more recommended player' + (available === 1 ? '' : 's') + ' available. How many would you like to add?</p>' +
+      '<input type="number" id="addMoreCount" class="statsSearchInput" style="width:100%; margin-bottom:14px;" min="1" max="' + available + '" value="' + defaultCount + '">' +
+      '<button class="startBtn" id="addMoreConfirmBtn" style="width:100%;">Add Players</button>' +
+    '</div>';
+  document.getElementById('addMoreCloseBtn').addEventListener('click', closeAddMoreModal);
+  document.getElementById('addMoreConfirmBtn').addEventListener('click', () => {
+    const input = document.getElementById('addMoreCount');
+    let n = parseInt(input.value, 10);
+    if (isNaN(n) || n < 1) n = 1;
+    if (n > available) n = available;
+    closeAddMoreModal();
+    addMorePlayers(n);
+  });
+  overlay.classList.remove('hidden');
+}
+
+function closeAddMoreModal() {
+  const overlay = document.getElementById('addMoreOverlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+document.getElementById('addMoreBtn').addEventListener('click', openAddMoreModal);
+
 function shiftTierBreaksForInsert(pos) {
   if (tierBreaks.size === 0) return;
   const shifted = new Set();
@@ -1028,6 +1157,7 @@ function render() {
   document.getElementById('downloadBtn').classList.toggle('hidden', !done);
   document.getElementById('cheatSheetBtn').classList.toggle('hidden', !done);
   document.getElementById('excelBtn').classList.toggle('hidden', !done);
+  document.getElementById('addMoreBtn').classList.toggle('hidden', !done || getAddMoreAvailableCount() === 0);
   document.getElementById('undoBtn').disabled = history.length === 0;
   document.getElementById('addPlayerSection').classList.toggle('hidden', !done);
 
@@ -1408,6 +1538,11 @@ loadCompletedRankings();
 initResumeBanner();
 initFormatModeControls();
 initPlayerPool();
+// auth.js (loaded after this block) defines supabaseClient -- wait for its
+// authReady event rather than calling directly, same pattern cloud-sync.js
+// already uses for the same reason. Consensus data is public, so this
+// fires regardless of whether anyone's actually logged in.
+document.addEventListener('authReady', () => loadCommunityConsensus());
 </script>
 
 <footer class="siteFooter">

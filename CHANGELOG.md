@@ -2,6 +2,33 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.12 — 2026-08-14
+
+- **New: rankings now seed from real community consensus, not just 2025 PPG, once there's enough data** — a player the crowd genuinely rates highly now surfaces near the top of the pool even if their raw stats look quiet, exactly the "underrated by the numbers, rated by real people" case this was built for
+- **Confidence threshold**: a player needs 5+ real community rankings before consensus overrides the stats-based order; below that, seeding works exactly as it always has, so one or two early opinions can't distort what anyone else sees
+- Scoped to Rest-of-Season rankings for now (Weekly matchup mode still uses stats-based seeding only, since consensus data doesn't have a weekly breakdown yet)
+- Verified directly: a statistically quiet player with 8 confident community rankings jumped from where their stats alone would place them (deep in the pack) to right near their real consensus rank. The identical stat line with only 2 rankers correctly stayed exactly where the stats-based model would put it
+- A real ordering bug was caught and fixed while building this: `auth.js` (which sets up the database connection) loads *after* the main script block, so the consensus data fetch was initially wired to run before that connection existed. Fixed using the same "wait for the ready signal" pattern already used elsewhere in the site, rather than assuming load order
+
+## v0.11 — 2026-08-14
+
+- **New: Community Consensus page** (`consensus.html`) — shows real aggregated rankings pulled from everyone's submitted data, not just one person's board
+- Filter by format (PPR/Half/Standard) and board (Overall, RB, QB, WR, TE)
+- Each player shows their average community rank, the range of ranks they've received (best-worst), and how many people have ranked them
+- **Players with too few rankers get flagged** rather than hidden or silently trusted — under 5 rankers shows a warning, since a rank built on 2 people's opinions isn't a real consensus yet
+- On the Overall board specifically, each player's own position-specific consensus rank shows alongside their overall one, when available
+- Publicly viewable by anyone, logged in or not — reads from the `community_averages` view, which only ever exposes averaged numbers, never which individual person ranked what
+- Added to the sidebar nav on every page
+- Tested against realistic seed data: correct sorting, correct thin-sample flagging, and a genuinely empty board (Overall, since no Overall ranking has been submitted yet) shows an honest "no data yet" message instead of breaking or showing nothing
+
+## v0.10 — 2026-08-14
+
+- **New: "Add More Players"** — once a ranking is finished, a new button lets you extend it with the next batch of recommended players (you choose how many) instead of redoing everything or hunting for them one at a time via search
+- Every newly added player gets compared against your **entire existing list**, not just against each other or appended at the end — verified directly: added a rookie in a test run and it correctly slotted in at #1 based on comparisons against all 5 already-ranked players, exactly as if it had been part of the original ranking
+- Works for both single-position and Overall rankings. For Overall specifically, verified new players still respect within-position ordering (new WRs land among the WRs, new RBs among the RBs), matching how the initial merge already works
+- The button only appears when there's actually more to add — hidden once you've ranked every available player at that position
+- Fully tested against real ranking state, not just visually: confirmed correct player counts, zero duplicates, and comparisons correctly resuming mid-flow with the right progress counter
+
 ## v0.09.1 — 2026-08-13
 
 - **Fixed: 128 players were showing stale teams** — the automated data build only used the current-roster file to *add* brand-new players (rookies), but never used it to *update* the team of anyone who already had 2025 stats. So anyone traded or signed elsewhere since their 2025 season kept showing their old team indefinitely. Caught via three real examples (Travis Etienne → now correctly New Orleans, Rico Dowdle → Pittsburgh, Kenny Gainwell → Tampa Bay) and fixed for everyone, not just those three

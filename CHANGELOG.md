@@ -2,6 +2,10 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.16 — 2026-08-14
+
+- **New: "Get in Touch" section on the About page** — real, working contact info: `hello@snap-rank-fantasy.com` and the `@SnapRankFantasy` X account, both now actually live
+
 ## v0.15 — 2026-08-14
 
 - **Redesigned PDF exports** — real logo in the header, white printer-friendly background with color used only as accents, and a small team-color stripe per row

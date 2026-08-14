@@ -2,6 +2,15 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.15 — 2026-08-14
+
+- **Redesigned PDF exports** — real logo in the header, white printer-friendly background with color used only as accents, and a small team-color stripe per row
+- **Position-specific downloads**: downloading from a single position's finished screen now only includes that position, not every completed board
+- **Restructured Overall PDF**: one page per position first, then a compact "all players merged" section — and this section now correctly spans as many pages as needed rather than being forced onto one page, so it always includes every ranked player regardless of how many you ranked. Stress-tested with 260 players (produced a clean 4 pages, no cut-off content)
+- **New: Mock Draft Board** — a "Generate Mock Draft Board" button appears once an Overall ranking is finished. Enter your league's team count, draft type (snake/linear), and whether to use 3rd Round Reversal, and your Overall rankings fill into the shape of a real draft board as a landscape PDF
+- The snake/3RR pick-order logic was unit-tested in isolation against hand-verified expected sequences for all three modes (standard snake, 3RR, linear) before being wired into the PDF, and separately verified end-to-end with real completed rankings
+- Two real bugs were caught and fixed while building this: a PDF library image-embedding issue (worked around by flattening the logo onto white and using JPEG), and a subtle pagination conflict where 3-digit rank numbers wrapped to two lines and silently broke the page-break math for large Overall boards
+
 ## v0.14 — 2026-08-14
 
 - **New: downloads now require an account** — the text/PDF/Excel download buttons only show once logged in; logged-out users see a banner explaining why ("log in to download this ranking, save it, and see how it compares to the community consensus") with a direct login/signup button in its place

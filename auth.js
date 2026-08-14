@@ -84,12 +84,16 @@ function renderAuthModalContent(statusMsg, statusIsError) {
   const switchText = authMode === 'login'
     ? 'Don\u2019t have an account? <a href="#" id="authSwitchLink">Sign up</a>'
     : 'Already have an account? <a href="#" id="authSwitchLink">Log in</a>';
+  const privacyNote = authMode === 'signup'
+    ? '<p style="font-size:12px; margin-bottom:12px; color:var(--ink-faint);">Just your email and your rankings &mdash; see <a href="about.html#privacy" target="_blank">what that means</a>.</p>'
+    : '';
 
   content.innerHTML =
     '<h2 class="display" style="font-size:1.6rem; margin-bottom:16px;">' + title + '</h2>' +
     '<form id="authForm">' +
       '<input type="email" id="authEmail" class="statsSearchInput" placeholder="Email" required style="width:100%; margin-bottom:10px;" autocomplete="email">' +
       '<input type="password" id="authPassword" class="statsSearchInput" placeholder="Password (min. 6 characters)" required minlength="6" style="width:100%; margin-bottom:14px;" autocomplete="' + (authMode === 'login' ? 'current-password' : 'new-password') + '">' +
+      privacyNote +
       (statusMsg ? '<p style="font-size:13px; margin-bottom:12px; color:' + (statusIsError ? 'var(--oxblood)' : '#1a7a3c') + ';">' + statusMsg + '</p>' : '') +
       '<button type="submit" class="startBtn" style="width:100%;" id="authSubmitBtn">' + title + '</button>' +
     '</form>' +

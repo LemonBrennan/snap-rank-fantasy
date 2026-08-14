@@ -91,6 +91,16 @@
 </div>
 
 <div class="startScreen" id="startScreen">
+  <div class="introHint hidden" id="introHint">
+    <button class="introHintClose" id="introHintClose" title="Got it">&times;</button>
+    <strong>How this works:</strong> pick a position, then you'll see two players at a time &mdash;
+    just choose who you'd rather have. Do that a bunch of times and the full ranking builds itself underneath you, no need to place every player by hand.
+  </div>
+  <div class="loginPromptBanner hidden" id="loginPromptBanner">
+    <button class="introHintClose" id="loginPromptClose" title="Dismiss for now">&times;</button>
+    <p><strong>Have an account?</strong> Log in first to save your rankings, download them, and see how they compare to the <a href="consensus.html">community consensus</a>. You can still rank players either way &mdash; this just makes sure you don't lose anything.</p>
+    <button class="btn primary" id="loginPromptBtn">Log In / Sign Up</button>
+  </div>
   <div class="resumeBanner hidden" id="resumeBanner">
     <p id="resumeBannerText"></p>
     <div class="btnRow">
@@ -143,6 +153,10 @@
     </div>
   </div>
 
+  <div class="funnelBanner hidden" id="funnelBanner">
+    <p>Log in to download this ranking, save it to come back to later, and see how it compares to the <a href="consensus.html">community consensus</a>.</p>
+    <button class="btn primary" id="funnelLoginBtn">Log In / Sign Up</button>
+  </div>
   <div class="actions">
     <button class="btn primary hidden" id="downloadBtn">&#8681; Download rankings</button>
     <button class="btn primary hidden" id="cheatSheetBtn">&#8681; Download Cheat Sheet (PDF)</button>
@@ -452,7 +466,34 @@ function buildStartScreen() {
       updateStartBtn();
     });
   });
+
+  updateLoginPromptBanner();
 }
+
+let loginPromptDismissedThisSession = false;
+
+function updateLoginPromptBanner() {
+  const banner = document.getElementById('loginPromptBanner');
+  if (!banner) return;
+  const loggedIn = typeof currentUser !== 'undefined' && !!currentUser;
+  banner.classList.toggle('hidden', loggedIn || loginPromptDismissedThisSession);
+}
+
+document.getElementById('loginPromptClose').addEventListener('click', () => {
+  loginPromptDismissedThisSession = true;
+  document.getElementById('loginPromptBanner').classList.add('hidden');
+});
+document.getElementById('loginPromptBtn').addEventListener('click', () => {
+  if (typeof openAuthModal === 'function') openAuthModal();
+});
+document.getElementById('funnelLoginBtn').addEventListener('click', () => {
+  if (typeof openAuthModal === 'function') openAuthModal();
+});
+
+// Keep both auth-dependent prompts in sync the moment login state actually
+// changes, not just on the next render/rebuild.
+document.addEventListener('authReady', () => { updateLoginPromptBanner(); if (MODE) render(); });
+document.addEventListener('authStateChanged', () => { updateLoginPromptBanner(); if (MODE) render(); });
 
 function rebuildCountGrid() {
   const countGrid = document.getElementById('countGrid');
@@ -1154,9 +1195,11 @@ function render() {
     waitingNoteEl.textContent = '';
   }
 
-  document.getElementById('downloadBtn').classList.toggle('hidden', !done);
-  document.getElementById('cheatSheetBtn').classList.toggle('hidden', !done);
-  document.getElementById('excelBtn').classList.toggle('hidden', !done);
+  const loggedIn = typeof currentUser !== 'undefined' && !!currentUser;
+  document.getElementById('downloadBtn').classList.toggle('hidden', !done || !loggedIn);
+  document.getElementById('cheatSheetBtn').classList.toggle('hidden', !done || !loggedIn);
+  document.getElementById('excelBtn').classList.toggle('hidden', !done || !loggedIn);
+  document.getElementById('funnelBanner').classList.toggle('hidden', !done || loggedIn);
   document.getElementById('addMoreBtn').classList.toggle('hidden', !done || getAddMoreAvailableCount() === 0);
   document.getElementById('undoBtn').disabled = history.length === 0;
   document.getElementById('addPlayerSection').classList.toggle('hidden', !done);
@@ -1512,6 +1555,20 @@ function initFormatModeControls() {
   });
 }
 
+const INTRO_HINT_SEEN_KEY = 'srf_intro_seen_v1';
+
+function initIntroHint() {
+  let seen = false;
+  try { seen = localStorage.getItem(INTRO_HINT_SEEN_KEY) === '1'; } catch (e) {}
+  if (seen) return;
+  const hint = document.getElementById('introHint');
+  hint.classList.remove('hidden');
+  document.getElementById('introHintClose').addEventListener('click', () => {
+    hint.classList.add('hidden');
+    try { localStorage.setItem(INTRO_HINT_SEEN_KEY, '1'); } catch (e) {}
+  }, { once: true });
+}
+
 function initResumeBanner() {
   const snap = loadActiveSession();
   if (!snap) return;
@@ -1535,6 +1592,7 @@ function initResumeBanner() {
 }
 
 loadCompletedRankings();
+initIntroHint();
 initResumeBanner();
 initFormatModeControls();
 initPlayerPool();

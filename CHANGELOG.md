@@ -2,6 +2,21 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.14 — 2026-08-14
+
+- **New: downloads now require an account** — the text/PDF/Excel download buttons only show once logged in; logged-out users see a banner explaining why ("log in to download this ranking, save it, and see how it compares to the community consensus") with a direct login/signup button in its place
+- **New: pre-ranking account prompt** — logged-out visitors see a dismissible banner on the start screen before they begin, explaining what an account unlocks. Only shown to logged-out users; never appears once logged in. Dismissing it lasts for the rest of that visit
+- Ranking itself, "Add More Players," and "Change position/count" all remain fully free and ungated either way — only saving, downloading, and the community comparison are behind login
+- **Verified the reactive update specifically**: logged in via the funnel banner's own button *without* making any new picks afterward, and confirmed both the banner and the real download buttons updated immediately — this only works because of an event-driven update tied to the actual login moment, not just the next time something else happens to re-render the page
+- Also verified: dismissing the pre-ranking prompt stays dismissed even after navigating away and back via "Change position / count" within the same visit
+
+## v0.13 — 2026-08-14
+
+- **New: privacy section on the About page** — plain-English explanation of exactly what an account involves (email, your rankings), that individual picks are never shown to anyone but you, and that Community Consensus only ever sees anonymized aggregates. Also linked directly from the sign-up form itself, right at the moment someone's deciding whether to share an email
+- **New: first-time "how this works" hint** — a dismissible banner on the start screen explaining the head-to-head mechanic to first-time visitors. Shows once, stays dismissed after that (tested: shows on first visit, dismissing it persists correctly across a reload)
+- **Fixed: "My Rankings" rows were cramped on mobile** — found during this round's mobile testing pass; the title text was wrapping awkwardly against the action buttons. Now stacks cleanly (info on top, buttons below) below 520px width
+- Mobile-tested the "Add More Players" and "My Rankings" modals specifically, since they were built in recent rounds and hadn't had a dedicated mobile pass yet — both confirmed zero horizontal overflow
+
 ## v0.12 — 2026-08-14
 
 - **New: rankings now seed from real community consensus, not just 2025 PPG, once there's enough data** — a player the crowd genuinely rates highly now surfaces near the top of the pool even if their raw stats look quiet, exactly the "underrated by the numbers, rated by real people" case this was built for

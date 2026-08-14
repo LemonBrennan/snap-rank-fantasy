@@ -226,6 +226,26 @@
   .resumeBanner p { margin: 0; font-size: 13px; color: var(--ink); flex: 1; min-width: 200px; }
   .resumeBanner .btnRow { display: flex; gap: 8px; }
 
+  .introHint {
+    position: relative; background: rgba(122,36,24,0.06); border: 1px solid var(--oxblood-soft);
+    border-radius: 8px; padding: 14px 40px 14px 16px; margin-bottom: 24px;
+    font-size: 13px; line-height: 1.6; color: var(--ink);
+  }
+  .introHintClose {
+    position: absolute; top: 10px; right: 10px; background: none; border: none;
+    color: var(--ink-faint); font-size: 18px; line-height: 1; cursor: pointer; padding: 4px;
+  }
+  .introHintClose:hover { color: var(--oxblood); }
+
+  .loginPromptBanner, .funnelBanner {
+    position: relative; background: rgba(185,121,26,0.1); border: 1px solid var(--mustard);
+    border-radius: 8px; padding: 14px 40px 14px 16px; margin-bottom: 24px;
+  }
+  .loginPromptBanner p, .funnelBanner p { margin: 0 0 10px; font-size: 13px; line-height: 1.6; color: var(--ink); }
+  .loginPromptBanner .btn, .funnelBanner .btn { font-size: 13px; padding: 8px 16px; }
+  .funnelBanner { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-right: 16px; }
+  .funnelBanner p { margin: 0; flex: 1; min-width: 220px; }
+
   /* Start screen */
   .startScreen { max-width: 780px; margin: 0 auto; padding: 2.5rem 1.5rem 0; }
   .startLabel { font-size: 12px; letter-spacing: 0.14em; color: var(--ink-soft); font-weight: 700; margin: 0 0 14px; }
@@ -464,3 +484,8 @@
     border-radius: 50%; width: 26px; height: 26px; font-size: 14px; cursor: pointer; font-family: inherit;
   }
   .myRankDeleteBtn:hover { border-color: var(--oxblood); color: var(--oxblood); background: rgba(122,36,24,0.08); }
+  @media (max-width: 520px) {
+    .myRankingRow { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .myRankingActions { width: 100%; }
+    .myRankingActions .btn { flex: 1; }
+  }

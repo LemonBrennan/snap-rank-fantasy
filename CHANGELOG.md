@@ -2,6 +2,14 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.18 — 2026-08-14
+
+- **Fixed: header spacing on the shareable image** — "Snap Rank Fantasy" was sitting too close to the title below it; the whole header now has proper breathing room
+- **Fixed: player photos now actually appear in the shareable image.** This took real digging: player photos load fine on the ranking cards via plain `<img>` tags throughout the site, but browsers cache that as a "no cross-origin" resource — so when the share-image feature tried to reuse that same photo in CORS mode (required to read it into a downloadable image), the browser silently refused, even though the photo genuinely supports it. Rebuilt the loading method to use `fetch()` instead of an image tag, which uses a separate request path and sidesteps the conflict entirely — confirmed fixed by reproducing the failure first, then verifying the new method resolves it
+- Added a modest concurrency cap (4 photos loading at once, not all 12 simultaneously) as a sensible defensive improvement for any image CDN under real-world load
+- Real player photos now appear in a clean circular crop matching the vintage card design, with a graceful per-card fallback to colored initials if any single photo ever fails to load, so one bad photo can never break the whole image
+- This was a genuinely difficult bug to track down, including a few dead-end hypotheses along the way (ruled out test-server flakiness, request ordering, and concurrency timing before finding the real cause) -- verified the final fix directly through the real ranking flow with real data, not just in isolation
+
 ## v0.17 — 2026-08-14
 
 - **Removed the plain text download** — replaced with **"Download Shareable Image"**, a vintage trading-card-grid PNG of your top 12 (Concept 2 from the mockups), built entirely with your real ranked data, real team colors, and the actual logo

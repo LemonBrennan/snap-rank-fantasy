@@ -1270,16 +1270,68 @@ function drawRoundedRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function generateShareImage() {
+/* Uses fetch() rather than a plain Image+crossOrigin request. This matters
+   because every player card shown during ranking already loads these same
+   headshot URLs via a normal <img> tag (no CORS mode) -- browsers cache
+   that as a no-CORS resource and won't correctly re-serve the same URL in
+   CORS mode afterward, which silently broke this if built the more obvious
+   way (verified directly: reproduced the failure, then confirmed fetch()
+   sidesteps it since it's an entirely separate request/cache pathway).
+   Resolves to the loaded Image, or null on any failure, so a single bad
+   photo can never break the whole download. */
+async function loadImageCORS(url, timeoutMs) {
+  if (!url) return null;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs || 4000);
+    const resp = await fetch(url, { mode: 'cors', signal: controller.signal });
+    clearTimeout(timer);
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
+    const objUrl = URL.createObjectURL(blob);
+    return await new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = objUrl;
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+/* Loads a list of image URLs with at most `limit` requests in flight at
+   once, preserving result order to match the input list. */
+async function loadImagesLimited(urls, limit) {
+  const results = new Array(urls.length);
+  let next = 0;
+  async function worker() {
+    while (next < urls.length) {
+      const i = next++;
+      results[i] = await loadImageCORS(urls[i]);
+    }
+  }
+  const workers = Array.from({ length: Math.min(limit, urls.length) }, worker);
+  await Promise.all(workers);
+  return results;
+}
+
+async function generateShareImage() {
   const W = 1080;
   const cols = 3;
   const top12 = ranked.slice(0, 12);
   const rows = Math.ceil(top12.length / cols) || 1;
-  const gridTop = 210, gap = 16;
+  const gridTop = 230, gap = 16;
   const cardH = 138;
   const gridBottomActual = gridTop + rows * cardH + (rows - 1) * gap;
   const footerTop0 = gridBottomActual + 28;
   const H = Math.round(footerTop0 + 96 + 46 + 60); // footer content + bottom margin, matches frame inset
+
+  // Try to load real headshots first (each one individually, so one bad
+  // photo just falls back to initials instead of breaking everything else).
+  // Load headshots with a modest concurrency cap rather than all 12 at
+  // once -- reasonable defensively for any image CDN, regardless of load.
+  const headshotImages = await loadImagesLimited(top12.map(p => p.headshot), 4);
 
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
@@ -1305,23 +1357,23 @@ function generateShareImage() {
   ctx.fillStyle = MUSTARD;
   ctx.font = '700 19px Helvetica, Arial, sans-serif';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('S N A P   R A N K   F A N T A S Y', left + 84, 88);
+  ctx.fillText('S N A P   R A N K   F A N T A S Y', left + 84, 86);
 
   const posLabel = MODE === 'OVERALL' ? 'Overall' : POSITION_LABELS[selectedPos];
   const cappedCount = Math.min(ranked.length, 12);
   ctx.fillStyle = OXBLOOD;
   ctx.font = '900 52px Impact, Arial Narrow, sans-serif';
-  ctx.fillText(('TOP ' + cappedCount + ' ' + posLabel).toUpperCase(), left + 84, 130);
+  ctx.fillText(('TOP ' + cappedCount + ' ' + posLabel).toUpperCase(), left + 84, 148);
 
   const formatLabel = sessionFormat === 'ppr' ? 'Full PPR' : sessionFormat === 'half' ? 'Half PPR' : 'Standard';
   ctx.fillStyle = INK;
   ctx.font = '400 18px Helvetica, Arial, sans-serif';
-  ctx.fillText('My ' + (sessionMode === 'WEEKLY' ? 'Week ' + sessionWeek : 'Rest-of-Season') + ' rankings  -  ' + formatLabel, left, 158);
+  ctx.fillText('My ' + (sessionMode === 'WEEKLY' ? 'Week ' + sessionWeek : 'Rest-of-Season') + ' rankings  -  ' + formatLabel, left, 178);
 
   ctx.strokeStyle = OXBLOOD; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(left, 178); ctx.lineTo(right, 178); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(left, 198); ctx.lineTo(right, 198); ctx.stroke();
   ctx.strokeStyle = MUSTARD; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(left, 184); ctx.lineTo(right, 184); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(left, 204); ctx.lineTo(right, 204); ctx.stroke();
 
   top12.forEach((p, i) => {
     const col = i % cols, row = Math.floor(i / cols);
@@ -1350,15 +1402,29 @@ function generateShareImage() {
     ctx.textAlign = 'center';
     ctx.fillText(String(i + 1), x + 25, y + 30);
 
-    // avatar circle with initials
+    // avatar: real headshot if it loaded successfully, else color + initials
     const avR = 32, avCx = x + cardW / 2, avCy = y + cardH * 0.42;
-    ctx.fillStyle = primary;
-    ctx.beginPath(); ctx.arc(avCx, avCy, avR, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(122,36,24,0.3)'; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(avCx, avCy, avR, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '700 19px Helvetica, Arial, sans-serif';
-    ctx.fillText(shareInitials(p.name), avCx, avCy + 7);
+    const photo = headshotImages[i];
+    if (photo) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(avCx, avCy, avR, 0, Math.PI * 2); ctx.closePath();
+      ctx.clip();
+      // cover-fit the photo into the circle
+      const scale = Math.max((avR * 2) / photo.width, (avR * 2) / photo.height);
+      const pw = photo.width * scale, ph = photo.height * scale;
+      ctx.drawImage(photo, avCx - pw / 2, avCy - ph / 2, pw, ph);
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(122,36,24,0.3)'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(avCx, avCy, avR, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      ctx.fillStyle = primary;
+      ctx.beginPath(); ctx.arc(avCx, avCy, avR, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(122,36,24,0.3)'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(avCx, avCy, avR, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '700 19px Helvetica, Arial, sans-serif';
+      ctx.fillText(shareInitials(p.name), avCx, avCy + 7);
+    }
 
     // name + team
     ctx.fillStyle = INK;
@@ -1423,12 +1489,19 @@ function wrapCenteredText(ctx, text, cx, y, maxWidth, lineHeight) {
   lines.forEach((line, i) => ctx.fillText(line, cx, startY + i * lineHeight));
 }
 
-document.getElementById('downloadImageBtn').addEventListener('click', () => {
+document.getElementById('downloadImageBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('downloadImageBtn');
+  const originalText = btn.textContent;
+  btn.textContent = 'Generating\u2026';
+  btn.disabled = true;
   try {
-    generateShareImage();
+    await generateShareImage();
   } catch (e) {
     console.error('Share image generation failed:', e);
     showToast("Something went wrong creating the image. Try refreshing the page and downloading again.");
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
   }
 });
 

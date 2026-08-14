@@ -2,6 +2,15 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.17 — 2026-08-14
+
+- **Removed the plain text download** — replaced with **"Download Shareable Image"**, a vintage trading-card-grid PNG of your top 12 (Concept 2 from the mockups), built entirely with your real ranked data, real team colors, and the actual logo
+- Includes a "Think you know better? Build your ranks at snap-rank-fantasy.com" call-to-action and your `@SnapRankFantasy` handle, both baked right into the image for exposure when people share it
+- Works for both single-position and Overall rankings (Overall cards show position tags, e.g. "WR - LAR")
+- Capped at 12 to keep the trading-card grid looking like a trading-card grid — for rankings with fewer than 12, the image resizes itself to fit exactly what's there rather than leaving a stretch of empty space at the bottom
+- Deliberately avoids embedding real player photos in this feature specifically, since generating an image via canvas requires reading pixel data from those photos, and the photo CDN may not permit that for cross-origin use in canvas the same way it permits simple display -- kept it to colored initials to guarantee this always works reliably instead of risking a silent failure
+- Tested with a real 20-player ranking (correctly caps at 12), a real 7-player ranking (correctly shows only what exists, resized appropriately), and a real Overall ranking (correctly shows position tags) -- zero errors across all three
+
 ## v0.16 — 2026-08-14
 
 - **New: "Get in Touch" section on the About page** — real, working contact info: `hello@snap-rank-fantasy.com` and the `@SnapRankFantasy` X account, both now actually live

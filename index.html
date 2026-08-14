@@ -158,7 +158,7 @@
     <button class="btn primary" id="funnelLoginBtn">Log In / Sign Up</button>
   </div>
   <div class="actions">
-    <button class="btn primary hidden" id="downloadBtn">&#8681; Download rankings</button>
+    <button class="btn primary hidden" id="downloadImageBtn">&#8681; Download Shareable Image</button>
     <button class="btn primary hidden" id="cheatSheetBtn">&#8681; Download Cheat Sheet (PDF)</button>
     <button class="btn primary hidden" id="excelBtn">&#8681; Download Rankings (Excel)</button>
     <button class="btn secondary hidden" id="addMoreBtn">+ Add More Players</button>
@@ -1197,7 +1197,7 @@ function render() {
   }
 
   const loggedIn = typeof currentUser !== 'undefined' && !!currentUser;
-  document.getElementById('downloadBtn').classList.toggle('hidden', !done || !loggedIn);
+  document.getElementById('downloadImageBtn').classList.toggle('hidden', !done || !loggedIn);
   document.getElementById('cheatSheetBtn').classList.toggle('hidden', !done || !loggedIn);
   document.getElementById('excelBtn').classList.toggle('hidden', !done || !loggedIn);
   document.getElementById('funnelBanner').classList.toggle('hidden', !done || loggedIn);
@@ -1251,31 +1251,184 @@ document.getElementById('addPlayerInput').addEventListener('input', (e) => {
   });
 });
 
-document.getElementById('downloadBtn').addEventListener('click', () => {
-  try {
-    const lines = [];
-    let tierNum = 1;
-    if (tierBreaks.size > 0) lines.push('--- Tier ' + tierNum + ' ---');
-    ranked.forEach((p, i) => {
-      lines.push((i + 1) + '. ' + p.name + ' (' + p.team + (MODE === 'OVERALL' ? ', ' + p.pos : '') + ')');
-      if (i < ranked.length - 1 && tierBreaks.has(i)) {
-        tierNum++;
-        lines.push('');
-        lines.push('--- Tier ' + tierNum + ' ---');
-      }
-    });
-    const text = lines.join('\n');
-    const blob = new Blob([text], { type: 'text/plain' });
+/* ---------- Shareable image (Trading Card Grid) ---------- */
+const SHARE_LOGO = new Image();
+SHARE_LOGO.src = 'assets/logo-large.png'; // same-origin asset, safe for canvas -- no CORS risk
+
+function shareInitials(name) {
+  const parts = name.replace(/['']/g, '').split(' ');
+  return ((parts[0][0] || '') + (parts[parts.length - 1][0] || '')).toUpperCase();
+}
+
+function drawRoundedRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function generateShareImage() {
+  const W = 1080;
+  const cols = 3;
+  const top12 = ranked.slice(0, 12);
+  const rows = Math.ceil(top12.length / cols) || 1;
+  const gridTop = 210, gap = 16;
+  const cardH = 138;
+  const gridBottomActual = gridTop + rows * cardH + (rows - 1) * gap;
+  const footerTop0 = gridBottomActual + 28;
+  const H = Math.round(footerTop0 + 96 + 46 + 60); // footer content + bottom margin, matches frame inset
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  const OXBLOOD = '#7A2418', MUSTARD = '#B9791A', PARCHMENT = '#F1E5C8', CARD = '#FBF4E2', INK = '#2A1810', INK_FAINT = '#8A7A6A';
+
+  // Background + vintage double-border frame
+  ctx.fillStyle = PARCHMENT;
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = OXBLOOD; ctx.lineWidth = 6;
+  drawRoundedRect(ctx, 28, 28, W - 56, H - 56, 18); ctx.stroke();
+  ctx.strokeStyle = MUSTARD; ctx.lineWidth = 2;
+  drawRoundedRect(ctx, 42, 42, W - 84, H - 84, 10); ctx.stroke();
+
+  const left = 66, right = W - 66;
+  const cardW = (right - left - gap * (cols - 1)) / cols;
+
+  // Header: logo + brand + title
+  if (SHARE_LOGO.complete && SHARE_LOGO.naturalWidth > 0) {
+    ctx.drawImage(SHARE_LOGO, left, 66, 64, 76.3);
+  }
+  ctx.fillStyle = MUSTARD;
+  ctx.font = '700 19px Helvetica, Arial, sans-serif';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('S N A P   R A N K   F A N T A S Y', left + 84, 88);
+
+  const posLabel = MODE === 'OVERALL' ? 'Overall' : POSITION_LABELS[selectedPos];
+  const cappedCount = Math.min(ranked.length, 12);
+  ctx.fillStyle = OXBLOOD;
+  ctx.font = '900 52px Impact, Arial Narrow, sans-serif';
+  ctx.fillText(('TOP ' + cappedCount + ' ' + posLabel).toUpperCase(), left + 84, 130);
+
+  const formatLabel = sessionFormat === 'ppr' ? 'Full PPR' : sessionFormat === 'half' ? 'Half PPR' : 'Standard';
+  ctx.fillStyle = INK;
+  ctx.font = '400 18px Helvetica, Arial, sans-serif';
+  ctx.fillText('My ' + (sessionMode === 'WEEKLY' ? 'Week ' + sessionWeek : 'Rest-of-Season') + ' rankings  -  ' + formatLabel, left, 158);
+
+  ctx.strokeStyle = OXBLOOD; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(left, 178); ctx.lineTo(right, 178); ctx.stroke();
+  ctx.strokeStyle = MUSTARD; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(left, 184); ctx.lineTo(right, 184); ctx.stroke();
+
+  top12.forEach((p, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const x = left + col * (cardW + gap), y = gridTop + row * (cardH + gap);
+    const colors = TEAM_COLORS[p.team] || TEAM_COLORS.FA;
+    const primary = colors[0];
+
+    ctx.fillStyle = CARD;
+    drawRoundedRect(ctx, x, y, cardW, cardH, 12); ctx.fill();
+    ctx.strokeStyle = OXBLOOD; ctx.lineWidth = 2.5;
+    drawRoundedRect(ctx, x, y, cardW, cardH, 12); ctx.stroke();
+
+    // top color stripe
+    ctx.save();
+    drawRoundedRect(ctx, x, y, cardW, 8, 9);
+    ctx.clip();
+    ctx.fillStyle = primary;
+    ctx.fillRect(x, y, cardW, 8);
+    ctx.restore();
+
+    // rank badge (top-left corner)
+    ctx.fillStyle = OXBLOOD;
+    ctx.beginPath(); ctx.arc(x + 25, y + 25, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 15px Impact, Arial Narrow, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(i + 1), x + 25, y + 30);
+
+    // avatar circle with initials
+    const avR = 32, avCx = x + cardW / 2, avCy = y + cardH * 0.42;
+    ctx.fillStyle = primary;
+    ctx.beginPath(); ctx.arc(avCx, avCy, avR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(122,36,24,0.3)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(avCx, avCy, avR, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '700 19px Helvetica, Arial, sans-serif';
+    ctx.fillText(shareInitials(p.name), avCx, avCy + 7);
+
+    // name + team
+    ctx.fillStyle = INK;
+    ctx.font = '700 15px Helvetica, Arial, sans-serif';
+    const nameY = y + cardH * 0.42 + avR + 24;
+    wrapCenteredText(ctx, p.name, avCx, nameY, cardW - 16, 17);
+    ctx.fillStyle = INK_FAINT;
+    ctx.font = '700 11px Helvetica, Arial, sans-serif';
+    ctx.fillText((MODE === 'OVERALL' ? p.pos + ' - ' : '') + p.team, avCx, y + cardH - 14);
+    ctx.textAlign = 'left';
+  });
+
+  // Footer CTA + handle -- positioned relative to the actual grid height,
+  // so a small ranking doesn't leave a large empty gap before the footer
+  const footerTop = gridBottomActual + 28;
+  ctx.strokeStyle = OXBLOOD; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(left, footerTop); ctx.lineTo(right, footerTop); ctx.stroke();
+
+  ctx.fillStyle = OXBLOOD;
+  ctx.font = '700 24px Helvetica, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Think you know better?', W / 2, footerTop + 42);
+  ctx.font = '400 19px Helvetica, Arial, sans-serif';
+  ctx.fillStyle = INK;
+  ctx.fillText('Build your ranks at snap-rank-fantasy.com', W / 2, footerTop + 70);
+  ctx.textAlign = 'left';
+
+  const handleText = '@SnapRankFantasy';
+  ctx.font = '700 24px Helvetica, Arial, sans-serif';
+  const handleW = ctx.measureText(handleText).width + 42;
+  const handleX = W / 2 - handleW / 2, handleY = footerTop + 96;
+  ctx.fillStyle = 'rgba(185,121,26,0.13)';
+  drawRoundedRect(ctx, handleX, handleY, handleW, 46, 23); ctx.fill();
+  ctx.strokeStyle = MUSTARD; ctx.lineWidth = 2;
+  drawRoundedRect(ctx, handleX, handleY, handleW, 46, 23); ctx.stroke();
+  ctx.fillStyle = OXBLOOD;
+  ctx.textAlign = 'center';
+  ctx.fillText(handleText, W / 2, handleY + 31);
+  ctx.textAlign = 'left';
+
+  canvas.toBlob(blob => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const fname = MODE === 'OVERALL' ? 'my-overall-rankings.txt' : 'my-' + selectedPos.toLowerCase() + '-rankings.txt';
-    a.href = url;
-    a.download = fname;
-    a.click();
+    const fname = 'snap-rank-fantasy-' + (MODE === 'OVERALL' ? 'overall' : selectedPos.toLowerCase()) + '-top' + cappedCount + '.png';
+    a.href = url; a.download = fname; a.click();
     URL.revokeObjectURL(url);
+  }, 'image/png');
+}
+
+function wrapCenteredText(ctx, text, cx, y, maxWidth, lineHeight) {
+  const words = text.split(' ');
+  let lines = [], current = '';
+  words.forEach(w => {
+    const test = current ? current + ' ' + w : w;
+    if (ctx.measureText(test).width > maxWidth && current) {
+      lines.push(current); current = w;
+    } else { current = test; }
+  });
+  if (current) lines.push(current);
+  if (lines.length > 2) lines = [lines[0], lines.slice(1).join(' ')]; // cap at 2 lines
+  const startY = lines.length > 1 ? y - lineHeight / 2 : y;
+  lines.forEach((line, i) => ctx.fillText(line, cx, startY + i * lineHeight));
+}
+
+document.getElementById('downloadImageBtn').addEventListener('click', () => {
+  try {
+    generateShareImage();
   } catch (e) {
-    console.error('Text download failed:', e);
-    showToast("Something went wrong creating the download. Try refreshing the page.");
+    console.error('Share image generation failed:', e);
+    showToast("Something went wrong creating the image. Try refreshing the page and downloading again.");
   }
 });
 

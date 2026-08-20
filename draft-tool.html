@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Draft Tool — Snap Rank Fantasy</title>
+<link rel="canonical" href="https://snap-rank-fantasy.com/draft-tool.html">
+<meta name="description" content="Track your live draft pick by pick, and see best available, positional needs, and value based on your own rankings.">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Draft Tool — Snap Rank Fantasy">
+<meta property="og:description" content="Track your live draft and see best available, needs, and value based on your own rankings.">
+<meta property="og:image" content="assets/og-image.png">
+<meta property="og:url" content="https://snap-rank-fantasy.com/draft-tool.html">
+
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="512x512" href="assets/favicon-512.png">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .draftSetupCard { max-width: 640px; margin: 0 auto; background: var(--card); border: 2px solid var(--oxblood-soft); border-radius: 12px; padding: 28px; }
+  .draftSetupRow { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .draftSetupRow label { display: block; font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .draftSetupRow input[type="number"], .draftSetupRow select {
+    width: 100%; background: var(--parchment); border: 2px solid var(--oxblood-soft); border-radius: 8px;
+    padding: 8px 10px; font-size: 14px; font-family: inherit; color: var(--ink);
+  }
+  .rosterGrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 18px; }
+  .rosterGrid div { text-align: center; }
+  .rosterGrid label { font-size: 11px; }
+  .rosterGrid input { width: 100%; text-align: center; padding: 6px; }
+  .draftBoardWrap { overflow-x: auto; margin-bottom: 24px; max-width: 100%; }
+  .draftGridTable { border-collapse: collapse; width: max-content; min-width: 100%; }
+  .draftGridTable th { background: var(--oxblood); color: #fff; font-size: 11px; padding: 6px 4px; white-space: nowrap; }
+  .draftGridTable th.mine { background: #1a7a3c; }
+  .draftGridTable td {
+    border: 1px solid var(--oxblood-soft); width: 108px; height: 54px; vertical-align: middle;
+    text-align: center; font-size: 10px; padding: 2px; cursor: pointer; background: var(--card);
+  }
+  .draftGridTable td.filled { cursor: default; background: var(--parchment); }
+  .draftGridTable td.mine-col { background: rgba(26,122,60,0.08); }
+  .draftGridTable td .rd { font-size: 9px; color: var(--ink-faint); }
+  .draftGridTable td .pname { font-weight: 700; font-size: 10px; line-height: 1.2; }
+  .draftGridTable td .pmeta { font-size: 9px; color: var(--ink-faint); }
+  .draftGridTable td .claimLabel { color: var(--mustard); font-weight: 700; font-size: 10px; }
+  .draftGridTable td:hover:not(.filled) { background: rgba(185,121,26,0.15); }
+  .draftPanelsGrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  .draftPanel { background: var(--card); border: 2px solid var(--oxblood-soft); border-radius: 10px; padding: 16px; }
+  .draftPanel h3 { font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--oxblood); margin: 0 0 10px; }
+  .draftPanelRow { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--oxblood-soft); font-size: 13px; }
+  .draftPanelRow.value { background: rgba(26,122,60,0.1); margin: 0 -8px; padding: 6px 8px; border-radius: 6px; border-bottom: none; }
+  .needBadge { background: var(--oxblood); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 700; }
+  .posTabRow { display: flex; gap: 6px; margin-bottom: 10px; }
+  .posTabRow .countChip { padding: 4px 10px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="appLayout">
+<aside class="sidebar">
+  <div class="sidebarLogo"><img src="assets/sidebar-logo.png" alt="Snap Rank Fantasy"></div>
+  <nav class="sidebarNav">
+    <a href="index.html" class="sidebarNavLink">Rank Players</a>
+    <a href="stats.html" class="sidebarNavLink">Stats Hub</a>
+    <a href="consensus.html" class="sidebarNavLink">Community Consensus</a>
+    <a href="injuries.html" class="sidebarNavLink">Injuries</a>
+    <a href="draft-tool.html" class="sidebarNavLink active">Draft Tool</a>
+    <a href="about.html" class="sidebarNavLink">About</a>
+  </nav>
+  <div class="authWidgetWrap" id="authWidget"></div>
+</aside>
+<div class="pageContent">
+
+<div class="yardlines">
+  <div class="wrap">
+    <div class="eyebrow">SNAP RANK FANTASY &middot; 2026 SEASON</div>
+    <h1 class="display">Draft Tool</h1>
+    <p class="sub">Track your draft pick by pick. Best available, positional needs, and value &mdash; all based on your own rankings, not just raw stats.</p>
+  </div>
+</div>
+
+<div class="main">
+
+<div id="draftSetup">
+  <div class="draftSetupCard">
+    <p class="startLabel" style="margin-bottom:14px;">LEAGUE SETTINGS</p>
+    <div class="draftSetupRow">
+      <div>
+        <label>Scoring Format</label>
+        <select id="setupFormat"><option value="ppr">Full PPR</option><option value="half">Half PPR</option><option value="standard">Standard</option></select>
+      </div>
+      <div>
+        <label>Number of Teams</label>
+        <input type="number" id="setupTeams" min="2" max="20" value="12">
+      </div>
+    </div>
+    <div class="draftSetupRow">
+      <div>
+        <label>Draft Type</label>
+        <select id="setupType"><option value="snake">Snake</option><option value="linear">Linear</option></select>
+      </div>
+      <div>
+        <label>Your Draft Slot</label>
+        <select id="setupSlot"></select>
+      </div>
+    </div>
+    <div class="draftSetupRow" id="setup3RRRow">
+      <div>
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="setup3RR" checked style="width:auto;"> 3rd Round Reversal
+        </label>
+      </div>
+    </div>
+    <p class="startLabel" style="margin-bottom:10px;">ROSTER CONSTRUCTION</p>
+    <div class="rosterGrid">
+      <div><label>QB</label><input type="number" id="rosterQB" min="0" max="4" value="1"></div>
+      <div><label>RB</label><input type="number" id="rosterRB" min="0" max="6" value="2"></div>
+      <div><label>WR</label><input type="number" id="rosterWR" min="0" max="6" value="2"></div>
+      <div><label>TE</label><input type="number" id="rosterTE" min="0" max="4" value="1"></div>
+      <div><label>FLEX</label><input type="number" id="rosterFLEX" min="0" max="4" value="1"></div>
+      <div><label>Bench</label><input type="number" id="rosterBENCH" min="0" max="15" value="6"></div>
+    </div>
+    <button class="startBtn" id="startDraftBtn" style="width:100%;">Start Draft</button>
+  </div>
+</div>
+
+<div id="draftLive" class="hidden">
+  <p class="statsResultCount" id="draftMeta"></p>
+  <div class="draftBoardWrap">
+    <table class="draftGridTable" id="draftGridTable"></table>
+  </div>
+  <div class="draftPanelsGrid">
+    <div class="draftPanel">
+      <h3>Best Available</h3>
+      <div id="bestAvailablePanel"></div>
+    </div>
+    <div class="draftPanel">
+      <h3>Best By Position</h3>
+      <div class="posTabRow" id="bestByPosTabs">
+        <div class="countChip selected" data-pos="RB">RB</div>
+        <div class="countChip" data-pos="WR">WR</div>
+        <div class="countChip" data-pos="QB">QB</div>
+        <div class="countChip" data-pos="TE">TE</div>
+      </div>
+      <div id="bestByPositionPanel"></div>
+    </div>
+    <div class="draftPanel">
+      <h3>Your Team Needs</h3>
+      <div id="teamNeedsPanel"></div>
+      <h3 style="margin-top:16px;">Reach Targets</h3>
+      <div id="reachPanel"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modalOverlay hidden" id="playerPickOverlay">
+  <div class="modalBox" style="max-width:420px;">
+    <button class="modalCloseBtn" id="playerPickCloseBtn">&times;</button>
+    <h2 class="display" style="font-size:1.4rem; margin-bottom:12px;" id="playerPickTitle">Who was picked?</h2>
+    <input type="text" id="playerPickSearch" class="statsSearchInput" placeholder="Search for a player&hellip;" style="width:100%; margin-bottom:12px;">
+    <div id="playerPickResults" style="max-height:320px; overflow-y:auto;"></div>
+  </div>
+</div>
+
+<footer class="siteFooter">
+  Snap Rank Fantasy is an independent, fan-made tool and is not affiliated with, endorsed by, or sponsored by the NFL, NFLPA, or any NFL team, player, or league. All team names, logos, and colors are property of their respective owners and are used here for identification purposes only. Player statistics, schedule, roster, and injury data courtesy of <a href="https://nflverse.nflverse.com/" target="_blank" rel="noopener">nflverse</a> (CC-BY 4.0). For entertainment and informational purposes only &mdash; not betting or financial advice.
+</footer>
+
+</div>
+</div>
+</div>
+
+<script src="data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="auth.js"></script>
+<script src="draft-tool.js"></script>
+</body>
+</html>

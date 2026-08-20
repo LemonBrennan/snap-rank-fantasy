@@ -53,6 +53,8 @@
     <a href="index.html" class="sidebarNavLink active">Rank Players</a>
     <a href="stats.html" class="sidebarNavLink">Stats Hub</a>
     <a href="consensus.html" class="sidebarNavLink">Community Consensus</a>
+    <a href="injuries.html" class="sidebarNavLink">Injuries</a>
+    <a href="draft-tool.html" class="sidebarNavLink">Draft Tool</a>
     <a href="about.html" class="sidebarNavLink">About</a>
   </nav>
   <div class="sidebarSection">
@@ -1034,7 +1036,20 @@ function statLineHTML(player, pos) {
   }
   const draftLine = draftLineHTML(player, pos);
   if (draftLine) lines.push(draftLine);
+  if (sessionMode === 'WEEKLY' && player.lastWeek) {
+    lines.push('<span style="color:var(--ink-faint); font-size:11px;">Last week (Wk ' + player.lastWeek.week + '): ' + lastWeekSummary(player.lastWeek, pos) + '</span>');
+  }
   return lines.join('<br>');
+}
+
+function lastWeekSummary(lw, pos) {
+  if (pos === 'QB') {
+    return fmt1(lw.passComp) + '/' + fmt1(lw.passAtt) + ', ' + fmt1(lw.passYds) + ' yds, ' + fmt1(lw.passTds) + ' TD, ' + fmt1(lw.passInt) + ' INT';
+  }
+  const parts = [];
+  if ((lw.rec || 0) > 0 || (lw.tgt || 0) > 0) parts.push(fmt1(lw.rec) + '/' + fmt1(lw.tgt) + ', ' + fmt1(lw.recYds) + ' yds, ' + fmt1(lw.recTds) + ' TD rec');
+  if ((lw.rushAtt || 0) > 0) parts.push(fmt1(lw.rushAtt) + ' car, ' + fmt1(lw.rushYds) + ' yds, ' + fmt1(lw.rushTds) + ' TD rush');
+  return parts.join(' &middot; ') || 'no stats recorded';
 }
 
 function playerCardHTML(player, isWinner) {
@@ -1045,9 +1060,14 @@ function playerCardHTML(player, isWinner) {
   const headshotHTML = player.headshot
     ? '<img class="headshot" src="' + player.headshot + '" alt="" onerror="this.style.display=\'none\'">'
     : '';
+  const INJURY_COLOR = { 'Out': '#7A2418', 'Doubtful': '#B9791A', 'Questionable': '#8A7A2A' };
+  const injuryHTML = (player.injury && player.injury.status)
+    ? '<span class="injuryBadge" style="background:' + (INJURY_COLOR[player.injury.status] || '#8A7A6A') + ';" title="' + (player.injury.injury || player.injury.status) + '">' + player.injury.status.charAt(0) + '</span>'
+    : '';
   return '<div class="pcard' + (isWinner ? ' won' : '') + '" data-uid="' + player.uid + '">' +
     '<div class="teamStripe" style="background:' + primary + '"></div>' +
     headshotHTML +
+    injuryHTML +
     '<span class="teamBadge" style="background:' + secondary + ';color:' + badgeText + '">' + player.team + '</span>' +
     '<div class="name display">' + player.name + '</div>' +
     '<div class="pos">' + posLabel + '</div>' +

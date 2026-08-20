@@ -2,6 +2,24 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.20 — 2026-08-14
+
+- **New: Weekly Rankings auto-pull current-season data.** Once real 2026 games are played, the pipeline now automatically replaces last year's baseline with real current-season stats for any player with 2+ games (matching the same confidence-threshold approach used elsewhere on the site), and adds a genuine "Last Week" stat line. Verified with real data before shipping: confirmed a real player's actual through-week and single-week numbers both compute correctly, and confirmed today's honest pre-season state (no 2026 games yet) degrades cleanly
+- **New: Draft Tool** (`draft-tool.html`) — a fully manual draft board (no external draft-site integration, deliberately, given the open licensing question around Sleeper's API for a feature this central). Set your league's scoring format, team count, snake/linear + 3rd Round Reversal, and roster construction, then click any cell to record who was actually picked
+- **Best Available, Best By Position, Team Needs, and Reach Targets** — all driven by your own saved Overall ranking (falls back to a stats-based pool if you're not logged in or haven't ranked one yet)
+- **Value highlighting** — players who've fallen well past their expected draft slot get flagged automatically. Verified directly: left a clearly elite player undrafted through 9 picks and confirmed it was correctly flagged with the exact right "fell by" number
+- A real, subtle mobile bug was found and fixed while building this: the site's responsive layout had a pre-existing issue where `align-items: flex-start` (correct for desktop's row layout) silently became a *width* rule instead of a *height* rule once the mobile layout switches to a column direction -- invisible until now because no page ever had content wide enough to expose it. Fixed at the actual root cause, verified it didn't regress any other page
+
+## v0.19 — 2026-08-14
+
+- **New: Injuries** — official NFL injury report data (practice participation, game status), pulled from nflverse (same free, commercially-safe source as everything else on the site — no new licensing question, unlike a Sleeper-based approach would have raised)
+- **New page**: `injuries.html`, filterable by position, sorted by severity (Out → Doubtful → Questionable)
+- **New: status badges directly on player cards**, in both the ranking tool and Stats Hub — a small colored "O" / "D" / "Q" circle shows right where you're making decisions, not just on a separate page you'd have to remember to check
+- Extended the automated weekly refresh to pull this data automatically going forward
+- Honest scope note, built into the page itself: this reflects the official weekly injury report, not real-time news — it won't catch same-day updates a reporter might tweet mid-practice
+- The data pipeline gracefully handles the current pre-season reality (no 2026 reports exist yet) rather than erroring, and will fill in automatically once Week 1 practice reports are filed — verified this both ways: confirmed today's real "no data yet" case degrades cleanly, and confirmed the actual merge logic is correct using real, verifiable 2025 season data (real injuries for real players, correctly matched)
+- Caught and fixed a real inefficiency while building this: the pipeline was retrying a permanent "file doesn't exist" error 4 times (wasting 50 seconds) instead of recognizing it can't be fixed by retrying
+
 ## v0.18 — 2026-08-14
 
 - **Fixed: header spacing on the shareable image** — "Snap Rank Fantasy" was sitting too close to the title below it; the whole header now has proper breathing room

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Injuries — Snap Rank Fantasy</title>
+<link rel="canonical" href="https://snap-rank-fantasy.com/injuries.html">
+<meta name="description" content="Current NFL injury report status for every player — official practice participation and game designations, kept current automatically.">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Injuries — Snap Rank Fantasy">
+<meta property="og:description" content="Current NFL injury report status for every player, kept current automatically.">
+<meta property="og:image" content="assets/og-image.png">
+<meta property="og:url" content="https://snap-rank-fantasy.com/injuries.html">
+
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="512x512" href="assets/favicon-512.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="appLayout">
+<aside class="sidebar">
+  <div class="sidebarLogo"><img src="assets/sidebar-logo.png" alt="Snap Rank Fantasy"></div>
+  <nav class="sidebarNav">
+    <a href="index.html" class="sidebarNavLink">Rank Players</a>
+    <a href="stats.html" class="sidebarNavLink">Stats Hub</a>
+    <a href="consensus.html" class="sidebarNavLink">Community Consensus</a>
+    <a href="injuries.html" class="sidebarNavLink active">Injuries</a>
+    <a href="draft-tool.html" class="sidebarNavLink">Draft Tool</a>
+    <a href="about.html" class="sidebarNavLink">About</a>
+  </nav>
+  <div class="authWidgetWrap" id="authWidget"></div>
+</aside>
+<div class="pageContent">
+
+<div class="yardlines">
+  <div class="wrap">
+    <div class="eyebrow">SNAP RANK FANTASY &middot; 2026 SEASON</div>
+    <h1 class="display">Injuries</h1>
+    <p class="sub">Official NFL injury report status &mdash; practice participation and game designations, refreshed automatically as the season goes.</p>
+  </div>
+</div>
+
+<div class="main">
+  <div class="statsControls">
+    <input type="text" id="injurySearch" class="statsSearchInput" placeholder="Search for a player by name&hellip;" autocomplete="off">
+    <div class="statsPosFilters" id="injuryPosFilters">
+      <div class="countChip selected" data-pos="ALL">All</div>
+      <div class="countChip" data-pos="RB">RB</div>
+      <div class="countChip" data-pos="QB">QB</div>
+      <div class="countChip" data-pos="WR">WR</div>
+      <div class="countChip" data-pos="TE">TE</div>
+    </div>
+  </div>
+  <p class="statsResultCount" id="injuryResultCount"></p>
+  <div id="injuryList"></div>
+</div>
+
+<footer class="siteFooter">
+  Snap Rank Fantasy is an independent, fan-made tool and is not affiliated with, endorsed by, or sponsored by the NFL, NFLPA, or any NFL team, player, or league. All team names, logos, and colors are property of their respective owners and are used here for identification purposes only. Player statistics, schedule, roster, and injury data courtesy of <a href="https://nflverse.nflverse.com/" target="_blank" rel="noopener">nflverse</a> (CC-BY 4.0). For entertainment and informational purposes only &mdash; not betting or financial advice. Injury status reflects the official weekly report and may not capture same-day news.
+</footer>
+
+</div>
+</div>
+
+<script src="data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="auth.js"></script>
+<script>
+
+const STATUS_ORDER = { 'Out': 0, 'Doubtful': 1, 'Questionable': 2 };
+const STATUS_COLOR = { 'Out': 'var(--oxblood)', 'Doubtful': '#B9791A', 'Questionable': '#8A7A2A' };
+
+let currentFilterPos = 'ALL';
+let currentQuery = '';
+
+let allInjured = [];
+POSITION_ORDER.forEach(pos => {
+  (POSITION_DATA[pos] || []).forEach(p => {
+    if (p.injury && (p.injury.status || (p.injury.practice && p.injury.practice !== 'Full Participation in Practice'))) {
+      allInjured.push({ ...p, pos });
+    }
+  });
+});
+allInjured.sort((a, b) => {
+  const sa = STATUS_ORDER[a.injury.status] ?? 3, sb = STATUS_ORDER[b.injury.status] ?? 3;
+  return sa - sb;
+});
+
+function renderInjuryList() {
+  const listEl = document.getElementById('injuryList');
+  const metaEl = document.getElementById('injuryResultCount');
+
+  let list = allInjured;
+  if (currentFilterPos !== 'ALL') list = list.filter(p => p.pos === currentFilterPos);
+  if (currentQuery) {
+    const q = currentQuery.toLowerCase();
+    list = list.filter(p => p.name.toLowerCase().includes(q));
+  }
+
+  if (allInjured.length === 0) {
+    metaEl.textContent = '';
+    listEl.innerHTML = '<p class="compNote">No injury data available yet &mdash; official reports start once the season begins. This page fills in automatically once Week 1 practice reports are filed, no need to check back manually.</p>';
+    return;
+  }
+  if (list.length === 0) {
+    metaEl.textContent = '';
+    listEl.innerHTML = '<p class="compNote">No players match that search.</p>';
+    return;
+  }
+
+  metaEl.textContent = list.length + ' player' + (list.length === 1 ? '' : 's') + ' currently on the injury report';
+
+  listEl.innerHTML = '<ol class="boardList">' + list.map(p => {
+    const statusColor = STATUS_COLOR[p.injury.status] || '#8A7A6A';
+    const statusBadge = p.injury.status
+      ? '<span class="rankPill" style="background:' + statusColor + '; color:#fff;">' + p.injury.status + '</span>'
+      : '<span class="tm">' + (p.injury.practice || '') + '</span>';
+    return '<li class="boardRow">' +
+      '<span class="posTag">' + p.pos + '</span>' +
+      '<span class="nm">' + p.name + '</span>' +
+      '<span class="tm">' + p.team + '</span>' +
+      (p.injury.injury ? '<span class="tm">' + p.injury.injury + '</span>' : '') +
+      '<span style="margin-left:auto;">' + statusBadge + '</span>' +
+    '</li>';
+  }).join('') + '</ol>';
+}
+
+document.getElementById('injurySearch').addEventListener('input', (e) => {
+  currentQuery = e.target.value.trim();
+  renderInjuryList();
+});
+document.getElementById('injuryPosFilters').querySelectorAll('.countChip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    currentFilterPos = chip.dataset.pos;
+    document.querySelectorAll('#injuryPosFilters .countChip').forEach(c => c.classList.toggle('selected', c === chip));
+    renderInjuryList();
+  });
+});
+
+renderInjuryList();
+</script>
+</body>
+</html>

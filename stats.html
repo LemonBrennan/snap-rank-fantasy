@@ -28,6 +28,8 @@
     <a href="index.html" class="sidebarNavLink">Rank Players</a>
     <a href="stats.html" class="sidebarNavLink active">Stats Hub</a>
     <a href="consensus.html" class="sidebarNavLink">Community Consensus</a>
+    <a href="injuries.html" class="sidebarNavLink">Injuries</a>
+    <a href="draft-tool.html" class="sidebarNavLink">Draft Tool</a>
     <a href="about.html" class="sidebarNavLink">About</a>
   </nav>
   <div class="authWidgetWrap" id="authWidget"></div>
@@ -140,8 +142,13 @@ function renderGrid() {
     const ppgLine = (p.hasStats !== false && p.stats)
       ? '<div class="miniPpg" style="color:' + textColor + ';">' + computePoints(p.stats, currentFormat).toFixed(1) + ' pts/gm (2025, ' + formatLabel + ')</div>'
       : '<div class="miniPpg" style="color:' + mutedText + ';">New to the league</div>';
+    const INJURY_COLOR = { 'Out': '#7A2418', 'Doubtful': '#B9791A', 'Questionable': '#8A7A2A' };
+    const injuryHTML = (p.injury && p.injury.status)
+      ? '<span class="injuryBadge" style="background:' + (INJURY_COLOR[p.injury.status] || '#8A7A6A') + '; border-color:' + primary + ';" title="' + (p.injury.injury || p.injury.status) + '">' + p.injury.status.charAt(0) + '</span>'
+      : '';
     return '<div class="statsCard" style="background:' + primary + ';border-color:' + secondary + ';" data-name="' + p.name.replace(/"/g,'&quot;') + '" data-pos="' + p.pos + '">' +
       hs +
+      injuryHTML +
       '<div class="nm" style="color:' + textColor + ';">' + p.name + '</div>' +
       '<div class="meta" style="color:' + mutedText + ';">' + p.team + ' &middot; ' + p.pos + '</div>' +
       ppgLine +

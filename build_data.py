@@ -59,6 +59,13 @@ def fetch_csv(url, dest, retries=4):
             with open(dest, 'wb') as f:
                 f.write(data)
             return pd.read_csv(dest, low_memory=False)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                raise  # permanent -- the file genuinely doesn't exist yet, retrying won't help
+            last_err = e
+            wait = 5 * (attempt + 1)
+            print(f'  fetch failed ({e}), retrying in {wait}s... (attempt {attempt+1}/{retries})')
+            time.sleep(wait)
         except Exception as e:
             last_err = e
             wait = 5 * (attempt + 1)
@@ -259,6 +266,116 @@ for pos, players in position_data.items():
             team_corrections += 1
             p['team'] = current_team
 print(f'Team corrections applied (player moved since their 2025 stats): {team_corrections}')
+
+# ---------- Injuries (official weekly NFL injury report) ----------
+# Uses SCHEDULE_SEASON since injury reports are filed for whichever season
+# is currently being played, not the completed season stats are built from.
+# Before the season starts, this file genuinely doesn't exist yet -- that's
+# expected, not an error, so this degrades gracefully rather than failing
+# the whole build.
+injury_matched = 0
+try:
+    injuries = fetch_csv(
+        f'https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_{SCHEDULE_SEASON}.csv',
+        'injuries_current.csv'
+    )
+    max_week = injuries['week'].max()
+    latest_injuries = injuries[injuries['week'] == max_week].copy()
+    injury_lookup = {}
+    for _, r in latest_injuries.iterrows():
+        key = normalize(r['full_name']) + '|' + r['position']
+        injury_lookup[key] = {
+            'status': r['report_status'] if pd.notna(r['report_status']) else None,
+            'practice': r['practice_status'] if pd.notna(r['practice_status']) else None,
+            'injury': r['report_primary_injury'] if pd.notna(r['report_primary_injury']) else (
+                r['practice_primary_injury'] if pd.notna(r.get('practice_primary_injury')) else None
+            ),
+        }
+    for pos, players in position_data.items():
+        for p in players:
+            info = injury_lookup.get(normalize(p['name']) + '|' + pos)
+            if info:
+                p['injury'] = info
+                injury_matched += 1
+    print(f'Injury statuses attached (week {max_week}): {injury_matched}')
+except Exception as e:
+    print(f'No injury data available yet this season (expected before Week 1): {e}')
+
+# ---------- Current-season (in-progress) stats ----------
+# Once real SCHEDULE_SEASON games have been played, a player's current-year
+# performance is a better predictor than last year's -- this replaces the
+# STATS_SEASON baseline with real current-season rate stats (for players
+# with enough games to trust, matching the same confidence-threshold
+# philosophy already used elsewhere on the site), and separately records
+# their most recent single week for "Last Week" display. Before the season
+# starts this file doesn't exist yet, which is expected, not an error.
+MIN_GAMES_FOR_CURRENT_SEASON = 2
+current_season_replacements = 0
+last_week_attached = 0
+try:
+    current_stats = fetch_csv(
+        f'https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_{SCHEDULE_SEASON}.csv',
+        'stats_current_season.csv'
+    )
+    current_stats = current_stats[current_stats['season_type'] == 'REG']
+    current_stats = current_stats[current_stats['position'].isin(POSITIONS)]
+    current_stats['team'] = current_stats['team'].replace(TEAM_REMAP)
+
+    cur_grouped = current_stats.groupby(['player_display_name', 'position']).agg(
+        games=('week', 'nunique'),
+        rushing_yards=('rushing_yards', 'sum'), rushing_tds=('rushing_tds', 'sum'), carries=('carries', 'sum'),
+        receptions=('receptions', 'sum'), targets=('targets', 'sum'),
+        receiving_yards=('receiving_yards', 'sum'), receiving_tds=('receiving_tds', 'sum'),
+        passing_yards=('passing_yards', 'sum'), passing_tds=('passing_tds', 'sum'),
+        passing_interceptions=('passing_interceptions', 'sum'),
+        completions=('completions', 'sum'), attempts=('attempts', 'sum'),
+    ).reset_index()
+
+    def build_stat_line(row, g, pos):
+        if pos != 'QB':
+            return {
+                'rushAtt': round(row['carries']/g,1), 'rushYds': round(row['rushing_yards']/g,1), 'rushTds': round(row['rushing_tds']/g,1),
+                'tgt': round(row['targets']/g,1), 'rec': round(row['receptions']/g,1), 'recYds': round(row['receiving_yards']/g,1), 'recTds': round(row['receiving_tds']/g,1),
+            }
+        pass_pct = round(row['completions']/row['attempts']*100,1) if row['attempts']>0 else 0
+        return {
+            'passComp': round(row['completions']/g,1), 'passAtt': round(row['attempts']/g,1), 'passPct': str(pass_pct),
+            'passYds': round(row['passing_yards']/g,1), 'passTds': round(row['passing_tds']/g,1), 'passInt': round(row['passing_interceptions']/g,1),
+            'rushAtt': round(row['carries']/g,1), 'rushYds': round(row['rushing_yards']/g,1), 'rushTds': round(row['rushing_tds']/g,1),
+        }
+
+    current_rate_lookup = {}
+    for _, row in cur_grouped.iterrows():
+        if row['games'] < MIN_GAMES_FOR_CURRENT_SEASON:
+            continue
+        key = normalize(row['player_display_name']) + '|' + row['position']
+        current_rate_lookup[key] = build_stat_line(row, row['games'], row['position'])
+
+    for pos, players in position_data.items():
+        for p in players:
+            key = normalize(p['name']) + '|' + pos
+            if key in current_rate_lookup:
+                p['stats'] = current_rate_lookup[key]
+                current_season_replacements += 1
+
+    # Last Week: each player's most recent single-week actual stat line
+    last_week_num = current_stats['week'].max()
+    last_week_rows = current_stats[current_stats['week'] == last_week_num]
+    for _, row in last_week_rows.iterrows():
+        pos = row['position']
+        line = build_stat_line(row, 1, pos)
+        line['week'] = int(last_week_num)
+        key = normalize(row['player_display_name']) + '|' + pos
+        for p in position_data.get(pos, []):
+            if normalize(p['name']) + '|' + pos == key:
+                p['lastWeek'] = line
+                last_week_attached += 1
+                break
+
+    print(f'Current-season ({SCHEDULE_SEASON}) stats replaced baseline for: {current_season_replacements} players (2+ games played)')
+    print(f'Last Week (week {int(last_week_num)}) attached for: {last_week_attached} players')
+except Exception as e:
+    print(f'No current-season stats available yet (expected before Week 1 finishes): {e}')
 
 # Merge in current-roster players not already in the stats pool (rookies, etc.)
 added = 0

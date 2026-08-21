@@ -2,6 +2,12 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.23 — 2026-08-20
+
+- **Fixed: Stats Hub's shareable image never had real photo support** -- it launched with initials-only by design (matching the approved mockup), but the main ranking tool's image already had real photo support built in, so this was a real gap between the two. Ported over the same proven photo-loading approach (the one that required a fetch()-based fix a few versions back, not a simple `<img>` swap) so the Stats Hub card now shows real player photos too, with the same reliable fallback to initials if a photo can't load
+- Verified directly: confirmed a real photo actually renders correctly in the circular avatar, and separately confirmed the fallback-to-initials path still works cleanly when no photo is available
+- **Removed the word "Shareable" from every download option site-wide** -- both "Download Image" buttons (main tool and Stats Hub) and the related login-prompt text now just say "Download Image" / "download an image card"
+
 ## v0.22 — 2026-08-20
 
 - **Fixed: the Stats Hub's "All" position filter only ever showed RBs** -- the default preview was capped at 60 players, but since RB alone has 200+, the cutoff always landed before QB/WR/TE ever got a chance to show. Now shows 15 from each position (60 total) so every position is represented by default. Verified with real data: confirmed all four positions actually appear now

@@ -2,6 +2,14 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.22 — 2026-08-20
+
+- **Fixed: the Stats Hub's "All" position filter only ever showed RBs** -- the default preview was capped at 60 players, but since RB alone has 200+, the cutoff always landed before QB/WR/TE ever got a chance to show. Now shows 15 from each position (60 total) so every position is represented by default. Verified with real data: confirmed all four positions actually appear now
+- **New: Download Shareable Image on the Stats Hub** -- available from any player's profile once logged in. Combines their key stats (with the same color-coded rank pills used on the page) and the veteran comp tool's "similar players, same career stage" insight into one vintage-styled card
+- Reused the exact same comp-matching logic already powering the on-page comp tool (refactored into a shared function) rather than duplicating it, so the shared image and the page can never drift out of sync with each other
+- Canvas sizes itself to whatever content actually exists for that player -- tested with a full 6-stat RB profile, a differently-shaped 6-stat QB profile, and a player with no comps available at all, and confirmed no wasted space or crashes in any case
+- Confirmed the comp section's up/green vs. down/red coloring both render correctly (not just one direction)
+
 ## v0.21 — 2026-08-20
 
 - **Fixed a real Supabase security linter warning**: `community_averages` was a view that (necessarily, but invisibly) ran with elevated permissions to compute an average across everyone's rankings. Replaced it with an explicit, hardened function (`get_community_averages`) instead — same result, but intentional and auditable, with `search_path` pinned to close off a schema-hijacking risk

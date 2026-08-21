@@ -90,12 +90,12 @@ async function loadConsensusData() {
   listEl.innerHTML = '<p class="compNote">Loading&hellip;</p>';
 
   const { data, error } = await supabaseClient
-    .from('community_averages')
-    .select('*')
-    .eq('format', currentFormat)
-    .eq('mode', 'ROS')
-    .eq('season', 2026)
-    .eq('week', 0);
+    .rpc('get_community_averages', {
+      p_format: currentFormat,
+      p_mode: 'ROS',
+      p_season: 2026,
+      p_week: 0,
+    });
 
   if (error) {
     listEl.innerHTML = '<p class="compNote">Couldn\u2019t load consensus data right now. Try again in a moment.</p>';

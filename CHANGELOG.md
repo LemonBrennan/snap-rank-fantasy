@@ -2,6 +2,13 @@
 
 All notable changes to Snap Rank Fantasy, in plain English, newest first.
 
+## v0.21 — 2026-08-20
+
+- **Fixed a real Supabase security linter warning**: `community_averages` was a view that (necessarily, but invisibly) ran with elevated permissions to compute an average across everyone's rankings. Replaced it with an explicit, hardened function (`get_community_averages`) instead — same result, but intentional and auditable, with `search_path` pinned to close off a schema-hijacking risk
+- **Closed a real privacy gap while in there**: the "needs 5+ real rankers" rule was previously just a visual warning on the Community Consensus page — the raw data was still fully readable by querying the API directly, bypassing the site entirely. A single person's pick could show up disguised as an "average of one." Now enforced in the database itself, so a thin sample is never returned via the API at all, however it's queried
+- Both places on the site that read community averages (the Consensus page, and consensus-driven ranking seeding) updated to use the new function -- verified directly: confirmed a well-sampled player still shows correctly, and confirmed a single-ranker player is now completely excluded from the results rather than just flagged
+- **Requires running `fix-security-definer.sql` once** in your Supabase SQL Editor. Does not delete or modify any data in `user_rankings` or `ranking_entries` -- only changes how the aggregate is computed and served
+
 ## v0.20 — 2026-08-14
 
 - **New: Weekly Rankings auto-pull current-season data.** Once real 2026 games are played, the pipeline now automatically replaces last year's baseline with real current-season stats for any player with 2+ games (matching the same confidence-threshold approach used elsewhere on the site), and adds a genuine "Last Week" stat line. Verified with real data before shipping: confirmed a real player's actual through-week and single-week numbers both compute correctly, and confirmed today's honest pre-season state (no 2026 games yet) degrades cleanly

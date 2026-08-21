@@ -258,11 +258,11 @@ async function loadCommunityConsensus() {
   if (typeof supabaseClient === 'undefined') return; // auth.js didn't load; degrade gracefully
   try {
     const { data, error } = await supabaseClient
-      .from('community_averages')
-      .select('board,format,player_uid,avg_rank,num_rankers')
-      .eq('mode', 'ROS')
-      .eq('season', 2026)
-      .eq('week', 0);
+      .rpc('get_community_averages', {
+        p_mode: 'ROS',
+        p_season: 2026,
+        p_week: 0,
+      });
     if (error || !data) return;
     const byKey = {};
     data.forEach(row => {
